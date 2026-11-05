@@ -26,23 +26,10 @@ It runs in a single Docker container, and only uses the Python standard library.
 
 ## Quick start
 
-Get the code, either from the zip archive:
-
 ```bash
-unzip gravitee-v4-migration.zip
-cd gravitee-v4-migration
-```
+git clone https://github.com/gravitee-io-labs/gravitee-v2-to-v4-migration-tool.git
+cd gravitee-v2-to-v4-migration-tool
 
-or from git:
-
-```bash
-git clone <this-repository-url> gravitee-v4-migration
-cd gravitee-v4-migration
-```
-
-Then start the tool:
-
-```bash
 cp .env.example .env    # required; editing it is optional (see Configuration)
 docker compose up -d --build ui
 ```

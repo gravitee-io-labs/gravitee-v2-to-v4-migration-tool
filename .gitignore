@@ -1,5 +1,4 @@
-# Credentials - never commit. Copy .env.example to .env instead.
-.env
+# .env is committed on purpose: it only holds UI_PORT. Never put credentials in it.
 
 # Runtime data: migration CSVs, logs and run history
 data/

@@ -198,9 +198,13 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field label { display: block; font-weight: 600; margin-bottom: 5px; }
 .field .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
-.field .env { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--faint); font-weight: 500; margin-left: 6px; }
 .field.full { grid-column: 1 / -1; }
 .input-group { display: flex; }
+.advanced { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 2px; }
+.advanced summary { cursor: pointer; font-weight: 600; width: fit-content; }
+.advanced summary::marker { color: var(--muted); }
+.advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+@media (max-width: 860px) { .advanced-grid { grid-template-columns: 1fr; } }
 .input.secret { -webkit-text-security: disc; }
 .input.secret.revealed { -webkit-text-security: none; }
 .input-group .input { border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -419,7 +423,9 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
   const state = {
     view: "apis",
     defaults: null,
-    conn: { base_url: "", org_id: "", env_id: "", token: "", auth_mode: "token", username: "", password: "", verify_ssl: true },
+    conn: { base_url: "", org_id: "", env_id: "", token: "", auth_mode: "token", username: "", password: "", verify_ssl: true,
+            retry_attempts: 3, retry_delay_s: 2, page_size: 100 },
+    advancedOpen: false,
     connStatus: "idle", // idle | loading | ok | error
     connError: "",
     apis: [], meta: null, loaded: false,
@@ -438,12 +444,13 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
     const c = state.conn;
     return { base_url: c.base_url, org_id: c.org_id, env_id: c.env_id, auth_mode: c.auth_mode,
              token: c.auth_mode === "token" ? c.token : "", username: c.username,
-             password: c.auth_mode === "basic" ? c.password : "", verify_ssl: c.verify_ssl };
+             password: c.auth_mode === "basic" ? c.password : "", verify_ssl: c.verify_ssl,
+             retry_attempts: c.retry_attempts, retry_delay_s: c.retry_delay_s, page_size: c.page_size };
   }
   function persistConn() {
-    const { base_url, org_id, env_id, auth_mode, verify_ssl } = state.conn;
+    const { base_url, org_id, env_id, auth_mode, verify_ssl, retry_attempts, retry_delay_s, page_size } = state.conn;
     // Only non-sensitive settings are kept in the browser: no token, password or username.
-    store.set("gvm.conn", { base_url, org_id, env_id, auth_mode, verify_ssl });
+    store.set("gvm.conn", { base_url, org_id, env_id, auth_mode, verify_ssl, retry_attempts, retry_delay_s, page_size });
   }
   function updatePill() {
     const pill = $("#conn-pill");
@@ -924,6 +931,7 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
   function renderHelp(section) {
     const toc = [
       ["quick-start", "Quick start"],
+      ["connection", "Connection settings"],
       ["csv", "Importing a CSV"],
       ["options", "Migration options"],
       ["statuses", "States and statuses"],
@@ -947,6 +955,28 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
             <li><b>Review.</b> Migrated APIs leave the V2 list automatically. Failures stay in the list with the reason, and every migration is recorded in <a href="#" data-go="runs">Logs</a>.</li>
           </ol>
           <div class="doc-note">Migration rewrites each API definition in place. Export or back up your APIs before migrating them.</div>
+        </section>
+
+        <section class="card card-pad" id="sec-connection">
+          <h2>Connection settings</h2>
+          <p>All the configuration is done in the <a href="#" data-go="connection">Connection</a> page: which Gravitee Management API to use and how to sign in. The only setting outside the tool is the port it is published on: <code>UI_PORT=8080</code> in the <code>.env</code> file of the project. To change it, edit <code>.env</code>, then run <code>docker compose up -d ui</code>.</p>
+          <div class="table-wrap"><table class="doc-table">
+            <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td>Base URL</td><td><code>http://host.docker.internal:8083</code></td><td>Management API root URL, without <code>/management</code>. From inside Docker, use <code>http://host.docker.internal:8083</code> for a Gravitee on your machine.</td></tr>
+              <tr><td>Organization ID, Environment ID</td><td><code>DEFAULT</code></td><td>Change them for a multi-organization or multi-environment installation.</td></tr>
+              <tr><td>Authentication</td><td>None</td><td>A personal access token (APIM Console › User › Tokens), or a username and password. Required.</td></tr>
+              <tr><td>Verify SSL certificates</td><td>On</td><td>Untick only for self-signed certificates outside production.</td></tr>
+              <tr><td>Retry attempts</td><td>3</td><td><i>Advanced settings.</i> Tries per request on server errors (HTTP 5xx) and network errors. 1 to 10.</td></tr>
+              <tr><td>Retry delay (seconds)</td><td>2</td><td><i>Advanced settings.</i> Wait between two tries. 0 to 60.</td></tr>
+              <tr><td>Page size</td><td>100</td><td><i>Advanced settings.</i> APIs fetched per request when listing. 1 to 1000.</td></tr>
+            </tbody>
+          </table></div>
+          <h3>What is remembered</h3>
+          <ul>
+            <li><b>Credentials are never saved.</b> They stay in this page's memory and are cleared when you close or reload the page; <b>Clear credentials</b> removes them right away.</li>
+            <li>The other settings, including the advanced ones, are remembered by your browser. <b>Reset to defaults</b> puts back the defaults listed above.</li>
+          </ul>
         </section>
 
         <section class="card card-pad" id="sec-csv">
@@ -1029,20 +1059,24 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
             <dt>HTTP 401 Unauthorized</dt>
             <dd>The token is invalid or expired. Create a new one in APIM Console › User › Tokens and paste it in <a href="#" data-go="connection">Connection</a>. Credentials are kept in the page's memory only: after a page reload, enter them again.</dd>
             <dt>Cannot reach Gravitee</dt>
-            <dd>From inside Docker, <code>localhost</code> is the container itself. Use <code>http://host.docker.internal:8083</code> for a Gravitee running on your machine, or the service name if Gravitee runs in the same Docker network.</dd>
+            <dd>From inside Docker, <code>localhost</code> is the container itself. Use <code>http://host.docker.internal:8083</code> for a Gravitee running on your machine, or the service name if Gravitee runs in the same Docker network. Set it in Connection › Base URL.</dd>
             <dt>"This API is out of sync"</dt>
             <dd>Deploy the API in APIM Console, click Refresh, then migrate again, or tick <i>Force migration</i>.</dd>
             <dt>SSL certificate errors</dt>
             <dd>For self-signed certificates in non-production environments, untick <i>Verify SSL certificates</i> in Connection.</dd>
+            <dt>Slow or unstable Gravitee</dt>
+            <dd>If listing or migrating fails with server errors (HTTP 5xx) or timeouts, raise <i>Retry attempts</i> and <i>Retry delay</i> in Connection › Advanced settings. With many APIs, a smaller <i>Page size</i> makes each listing request lighter.</dd>
+            <dt>Back on the Connection page after a reload</dt>
+            <dd>Expected: credentials are never stored. Enter them again.</dd>
           </dl>
         </section>
 
         <section class="card card-pad" id="sec-cli">
           <h2>Command line</h2>
-          <p>The original command-line workflow still works from the project folder:</p>
+          <p>The original command-line workflow still works from the project folder. Each command asks for the Management API URL, organization, environment and SSL option (press Enter to keep the default), then for a personal access token (leave it empty to use a username and password), with hidden input:</p>
           <pre class="doc-code">docker compose run --rm generate   # writes data/migration_input.csv
 docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
-          <p>On the command line, <code>auto_start=TRUE</code> starts the API whatever its previous state, and <code>force_migration=TRUE</code> forces the migration for that row.</p>
+          <p>On the command line, <code>auto_start=TRUE</code> starts the API whatever its previous state, and <code>force_migration=TRUE</code> forces the migration for that row. The command line uses the default advanced settings: 3 retry attempts, 2 seconds between retries, pages of 100 APIs.</p>
         </section>
         </div>
       </div>`;
@@ -1058,22 +1092,19 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
   // ---------- connection view ----------
   function renderConnection() {
     const c = state.conn, d = state.defaults || {};
-    const ignored = d.ignored_credentials || [];
     $("#main").innerHTML = `
       <div class="page-head"><div><h1>Connection</h1><div class="sub">Management API used to list and migrate APIs</div></div></div>
-      ${ignored.length ? `<div class="banner warn">${icon.alert}<div><div class="b-title">Credentials in .env are ignored</div>
-        <div class="b-body">Remove ${ignored.map((k) => `<span class="mono">${esc(k)}</span>`).join(", ")} from <span class="mono">.env</span>, then run <span class="mono">docker compose up -d ui</span>. Credentials are only accepted from this page.</div></div></div>` : ""}
       ${!hasCredentials() && state.connStatus !== "error" ? `<div class="banner info">${icon.plug}<div><div class="b-title">Sign in to your Gravitee Management API</div>
         <div class="b-body">Enter a token, or a username and password, to list your V2 APIs. Credentials stay in this page's memory only: they are never saved, and closing or reloading the page clears them.</div></div></div>` : ""}
       ${state.connStatus === "error" ? `<div class="banner err">${icon.alert}<div><div class="b-title">Last connection attempt failed</div><div class="b-body">${esc(state.connError)}</div></div></div>` : ""}
       <form class="card card-pad" id="conn-form" autocomplete="off">
         <div class="form-grid">
-          <div class="field full"><label for="f-base">Base URL <span class="env">GRAVITEE_BASE_URL</span></label>
+          <div class="field full"><label for="f-base">Base URL</label>
             <input class="input" id="f-base" required placeholder="http://localhost:8083" value="${esc(c.base_url)}">
             <div class="hint">From inside Docker, use <span class="mono">http://host.docker.internal:8083</span> to reach a Gravitee running on your machine.</div></div>
-          <div class="field"><label for="f-org">Organization ID <span class="env">GRAVITEE_ORG_ID</span></label>
+          <div class="field"><label for="f-org">Organization ID</label>
             <input class="input" id="f-org" placeholder="DEFAULT" value="${esc(c.org_id)}"></div>
-          <div class="field"><label for="f-env">Environment ID <span class="env">GRAVITEE_ENV_ID</span></label>
+          <div class="field"><label for="f-env">Environment ID</label>
             <input class="input" id="f-env" placeholder="DEFAULT" value="${esc(c.env_id)}"></div>
           <div class="divider"></div>
           <div class="field full"><label>Authentication</label>
@@ -1092,10 +1123,24 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
             <div class="hint">Kept in this page's memory only, never saved.</div></div>
           <div class="divider"></div>
           <label class="check-row field full"><input type="checkbox" class="cb" id="f-ssl" ${c.verify_ssl ? "checked" : ""}>
-            <span><span class="t">Verify SSL certificates</span> <span class="env">GRAVITEE_VERIFY_SSL</span><br><span class="d">Turn off only for self-signed certificates in non-production environments.</span></span></label>
+            <span><span class="t">Verify SSL certificates</span><br><span class="d">Turn off only for self-signed certificates in non-production environments.</span></span></label>
+          <details class="advanced field full" ${state.advancedOpen ? "open" : ""}>
+            <summary>Advanced settings</summary>
+            <div class="advanced-grid">
+              <div class="field"><label for="f-retries">Retry attempts</label>
+                <input class="input" id="f-retries" type="number" min="1" max="10" step="1" value="${esc(c.retry_attempts)}">
+                <div class="hint">Tries per request on server errors (HTTP 5xx) and network errors. 1 to 10.</div></div>
+              <div class="field"><label for="f-delay">Retry delay (seconds)</label>
+                <input class="input" id="f-delay" type="number" min="0" max="60" step="1" value="${esc(c.retry_delay_s)}">
+                <div class="hint">Wait between two tries. 0 to 60.</div></div>
+              <div class="field"><label for="f-page">Page size</label>
+                <input class="input" id="f-page" type="number" min="1" max="1000" step="1" value="${esc(c.page_size)}">
+                <div class="hint">APIs fetched per request when listing. 1 to 1000.</div></div>
+            </div>
+          </details>
         </div>
         <div class="form-foot">
-          <button type="button" class="btn ghost" id="reset-btn" title="Base URL, organization, environment and SSL from .env">Reset to .env defaults</button>
+          <button type="button" class="btn ghost" id="reset-btn" title="Put back the default URL, organization, environment, SSL option and advanced settings">Reset to defaults</button>
           ${hasCredentials() ? `<button type="button" class="btn" id="forget-btn">Clear credentials</button>` : ""}
           <button type="submit" class="btn primary" id="save-btn">${icon.plug.replace('stroke-width="1.8"', 'stroke-width="2.2"')} Save &amp; load APIs</button>
         </div>
@@ -1109,7 +1154,7 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
       if (SECRET_TYPE === "text") i.classList.toggle("revealed");
       else i.type = i.type === "password" ? "text" : "password";
     };
-    $("#reset-btn").onclick = () => { readForm(); applyDefaults(true); renderConnection(); toast("Restored .env defaults"); };
+    $("#reset-btn").onclick = () => { readForm(); applyDefaults(true); renderConnection(); toast("Defaults restored"); };
     const forget = $("#forget-btn");
     if (forget) forget.onclick = () => {
       state.conn.token = ""; state.conn.username = ""; state.conn.password = "";
@@ -1139,6 +1184,11 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
     if ($("#f-user")) c.username = v("#f-user").trim();
     if ($("#f-pass")) c.password = v("#f-pass");
     c.verify_ssl = $("#f-ssl").checked;
+    const num = (id, fallback) => { const n = parseInt(v(id), 10); return Number.isFinite(n) ? n : fallback; };
+    c.retry_attempts = num("#f-retries", c.retry_attempts);
+    c.retry_delay_s = num("#f-delay", c.retry_delay_s);
+    c.page_size = num("#f-page", c.page_size);
+    state.advancedOpen = $("details.advanced")?.open ?? state.advancedOpen;
   }
   function applyDefaults(force) {
     const d = state.defaults || {};
@@ -1148,6 +1198,9 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
     state.conn.env_id = src.env_id ?? d.env_id ?? "DEFAULT";
     state.conn.auth_mode = src.auth_mode ?? state.conn.auth_mode ?? "token";
     state.conn.verify_ssl = src.verify_ssl ?? d.verify_ssl ?? true;
+    state.conn.retry_attempts = src.retry_attempts ?? d.retry_attempts ?? 3;
+    state.conn.retry_delay_s = src.retry_delay_s ?? d.retry_delay_s ?? 2;
+    state.conn.page_size = src.page_size ?? d.page_size ?? 100;
     // Credentials typed in the page are kept: resetting only concerns non-secret settings.
     if (force) { store.set("gvm.conn", { auth_mode: state.conn.auth_mode }); for (const k in saved) delete saved[k]; }
   }

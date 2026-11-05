@@ -30,15 +30,14 @@ It runs in a single Docker container, and only uses the Python standard library.
 git clone https://github.com/gravitee-io-labs/gravitee-v2-to-v4-migration-tool.git
 cd gravitee-v2-to-v4-migration-tool
 
-cp .env.example .env    # required; editing it is optional (see Configuration)
 docker compose up -d --build ui
 ```
 
-Open **http://localhost:8080**.
+Open **http://localhost:8080**. To use another port, see [Changing the port](#changing-the-port-env).
 
-The tool opens on the **Connection** page: enter your **personal access token** (or a username and password) and click **Save & load APIs**. The URL, organization and environment are pre-filled from `.env`.
+The tool opens on the **Connection** page: check the Management API URL, organization and environment, enter your **personal access token** (or a username and password), and click **Save & load APIs**.
 
-Credentials are never stored, in `.env` or anywhere else: they stay in the page's memory and you enter them again each time you open the tool.
+Credentials are never stored: they stay in the page's memory and you enter them again each time you open the tool.
 
 To stop the tool:
 
@@ -48,26 +47,44 @@ docker compose down
 
 ## Configuration
 
-`.env` holds the **non-secret** settings only. It is mounted read-only in the container at `/config/gravitee.env`; after editing it, run `docker compose up -d ui` (or `docker compose restart ui`). The **Connection** page can override the base URL, organization, environment and SSL verification; empty fields fall back to `.env`.
+**All the configuration is done in the web interface, on the Connection page.** The browser remembers your settings, except the credentials, which are never stored.
 
-**Credentials are never read from `.env`.** The token, or username and password, are only accepted from the **Connection** page (and from the prompt of the command line). If `GRAVITEE_TOKEN`, `GRAVITEE_USERNAME` or `GRAVITEE_PASSWORD` are still in `.env`, they are ignored and the Connection page asks you to remove them.
-
-| Variable | Default | Description |
+| Setting | Default | Description |
 |---|---|---|
-| `GRAVITEE_BASE_URL` | `http://localhost:8083` | Management API URL, as seen **from inside the container**. See [Reaching Gravitee](#reaching-gravitee). |
-| `GRAVITEE_ORG_ID` | `DEFAULT` | Organization ID. |
-| `GRAVITEE_ENV_ID` | `DEFAULT` | Environment ID. |
-| `GRAVITEE_VERIFY_SSL` | `true` | Set to `false` only for self-signed certificates outside production. |
-| `GRAVITEE_RETRY_ATTEMPTS` | `3` | Retries on server errors (HTTP 5xx) and network errors. |
-| `GRAVITEE_RETRY_DELAY_S` | `2` | Seconds between retries. |
-| `GRAVITEE_PAGE_SIZE` | `100` | Page size when listing APIs. |
-| `UI_PORT` | `8080` | Port of the web interface on your machine. |
+| Base URL | `http://host.docker.internal:8083` | Management API root URL, as seen **from inside the container**. See [Reaching Gravitee](#reaching-gravitee). |
+| Organization ID | `DEFAULT` | |
+| Environment ID | `DEFAULT` | |
+| Authentication | *(none)* | A personal access token (APIM Console › User › Tokens), or a username and password. Required, entered each session, never stored. |
+| Verify SSL certificates | On | Turn off only for self-signed certificates outside production. |
+| Retry attempts | `3` | *Advanced settings.* Tries per request on server errors (HTTP 5xx) and network errors (1 to 10). |
+| Retry delay (seconds) | `2` | *Advanced settings.* Wait between two tries (0 to 60). |
+| Page size | `100` | *Advanced settings.* APIs fetched per request when listing (1 to 1000). |
+
+**Reset to defaults** on the Connection page puts back the defaults above.
+
+### Changing the port (`.env`)
+
+The web interface is published on port **8080**, set in the `.env` file at the root of the project:
+
+```
+UI_PORT=8080
+```
+
+To use another port, edit `UI_PORT` in `.env`, then restart the tool:
+
+```bash
+docker compose up -d ui
+```
+
+Then open the new address, e.g. `http://localhost:8090` for `UI_PORT=8090`. The port is the only setting in `.env`; never put credentials in it, as it is part of the repository.
 
 ### Reaching Gravitee
 
 Inside the container, `localhost` is the container itself, not your machine. Use:
 
-- **Gravitee running on your machine**: `http://host.docker.internal:8083`. This works on macOS, Windows and Linux; the compose file adds the host mapping Linux needs.
+Set the URL in the Connection page:
+
+- **Gravitee running on your machine**: `http://host.docker.internal:8083` (the default). This works on macOS, Windows and Linux; the compose file adds the host mapping Linux needs.
 - **Gravitee in another Docker Compose project**: attach the tool to that project's network and use the service name, e.g. `http://gravitee-management-api:8083`. In `docker-compose.yml`, replace the `gravitee_net` network definition with:
 
   ```yaml
@@ -141,13 +158,13 @@ The **Logs** page lists every migration with its target, options and result. Cli
 
 ### Connection
 
-The **Connection** page is the only place to enter credentials: a **personal access token**, or a **username and password**. They are kept in the page's memory only: never saved in the browser, never written by the server, and cleared when you close or reload the page. **Clear credentials** removes them from the page right away.
+The **Connection** page holds the whole configuration: the URL, organization, environment, SSL option and, under **Advanced settings**, the retry attempts, retry delay and page size (see [Configuration](#configuration)). It is also the only place to enter credentials: a **personal access token**, or a **username and password**. They are kept in the page's memory only: never saved in the browser, never written by the server, and cleared when you close or reload the page. **Clear credentials** removes them from the page right away. The other settings are remembered by your browser; **Reset to defaults** puts back the default values.
 
 ![Connection](docs/screenshots/07-connection.png)
 
 ### Built-in documentation
 
-**Help › Documentation** covers the same ground as this README inside the tool: quick start, CSV format with a downloadable template, options, statuses, logs and troubleshooting.
+**Help › Documentation** covers the same ground as this README inside the tool: quick start, connection settings, CSV format with a downloadable template, migration options, statuses, logs, troubleshooting and command line.
 
 ![Documentation](docs/screenshots/08-documentation.png)
 
@@ -192,7 +209,7 @@ The deployment state shown in the list comes from `GET .../apis/{id}` (`deployme
 
 ## Command line
 
-The original two-step workflow still works, using the same `.env`. Each command asks for a personal access token (leave it empty to use a username and password instead), with hidden input:
+The original two-step workflow still works. Each command asks for the Management API URL, organization, environment and SSL option (press Enter to keep the default), then for a personal access token (leave it empty to use a username and password instead), with hidden input:
 
 ```bash
 docker compose run --rm generate   # writes data/migration_input.csv with every V2 API
@@ -200,7 +217,7 @@ docker compose run --rm generate   # writes data/migration_input.csv with every 
 docker compose run --rm migrate    # migrates the rows with migrate_to_v4=TRUE
 ```
 
-Results are written to `data/migration_results.csv` and the log to `data/gravitee_migration.log`.
+Results are written to `data/migration_results.csv` and the log to `data/gravitee_migration.log`. The command line uses the default advanced settings: 3 retry attempts, 2 seconds between retries, pages of 100 APIs.
 
 On the command line, `auto_start=TRUE` starts the API whatever its previous state, and `force_migration=TRUE` forces the migration of that row.
 
@@ -230,7 +247,7 @@ To keep the history, back up `data/`. To reset it, stop the tool and delete `dat
 ├── static/index.html          web interface (single page, no build step)
 ├── Dockerfile
 ├── docker-compose.yml         ui service, plus generate / migrate for the CLI
-├── .env.example               configuration template
+├── .env                       port of the web interface (UI_PORT=8080)
 └── docs/screenshots/          images used in this README
 ```
 
@@ -239,20 +256,20 @@ To keep the history, back up `data/`. To reset it, stop the tool and delete `dat
 Python 3.10 or later, no dependencies:
 
 ```bash
-GRAVITEE_SETTINGS_FILE=.env DATA_DIR=./data WEB_PORT=8080 python3 web_app.py
+DATA_DIR=./data WEB_PORT=8080 python3 web_app.py
 ```
 
-In that case, `GRAVITEE_BASE_URL` is seen from your machine, so `http://localhost:8083` works for a local Gravitee. Credentials are entered in the Connection page, as with Docker.
+Everything is configured in the Connection page, as with Docker. The Base URL is then seen from your machine, so use `http://localhost:8083` for a local Gravitee.
 
 ## Security notes
 
 - **No credentials are stored anywhere.** The token, or username and password, are typed in the **Connection** page for each session.
-- The web interface has **no login of its own**: anyone who can reach the port can list and migrate APIs with the configured credentials. Keep it on `localhost` or a trusted network. The compose file publishes it on all interfaces; to restrict it to your machine, use `"127.0.0.1:${UI_PORT:-8080}:8080"` under `ports`.
-  - **`.env`** holds only the URL, organization, environment, SSL and tuning settings. Credential variables found in it are ignored, never read into memory, and reported in the Connection page. `.env` is still listed in `.gitignore` because it describes your environment.
-  - **Browser**: credentials stay in the page's memory until it is closed or reloaded. Only non-sensitive settings are kept in local storage (URL, organization, environment, authentication mode, SSL option). The token and password fields are not password inputs, so browsers and password managers don't offer to save them.
+  - **`.env`** only sets the port of the web interface, and is committed with the project. The tool doesn't read it.
+  - **Browser**: credentials stay in the page's memory until it is closed or reloaded. Only non-sensitive settings are kept in local storage: URL, organization, environment, authentication mode, SSL option and the advanced settings (retry attempts, retry delay, page size). The token and password fields are not password inputs, so browsers and password managers don't offer to save them.
   - **Server**: credentials arrive with each request and are not kept between requests. They are never written to `data/` or to the logs, and never returned by the API. A migration receives them on its standard input, not in its environment or command line, and the server drops its copy as soon as they are handed over.
   - **Docker**: no credentials in the image, in the container configuration (`docker inspect`) or in its environment.
   - **Command line**: `generate` and `migrate` ask for the token or username/password at start, with hidden input. Credentials in the environment are ignored.
+- The web interface has **no login of its own**: anyone who can reach the port can list and migrate APIs with the credentials typed in their own browser, and follow migrations started by others. Keep it on `localhost` or a trusted network. The compose file publishes it on all interfaces; to restrict it to your machine, use `"127.0.0.1:${UI_PORT:-8080}:8080"` under `ports`.
 - Between your browser and the tool, the token travels over plain HTTP. That's fine on `localhost`; to reach the tool from another machine, put it behind HTTPS.
 
 ## Troubleshooting
@@ -261,12 +278,13 @@ In that case, `GRAVITEE_BASE_URL` is seen from your machine, so `http://localhos
 |---|---|
 | `HTTP 401 Unauthorized` | The token is invalid or expired. Create a new one in APIM Console › User › Tokens, then paste it in **Connection**. |
 | Back on the Connection page after a reload | Expected: credentials are never stored. Enter them again. |
-| Cannot connect / connection refused | `GRAVITEE_BASE_URL` must be reachable from the container. See [Reaching Gravitee](#reaching-gravitee). |
+| Cannot connect / connection refused | The Base URL in Connection must be reachable from the container. See [Reaching Gravitee](#reaching-gravitee). |
 | `HTTP 404` when listing APIs | Check the organization and environment IDs, and that the base URL doesn't include `/management`. |
 | *"This API is out of sync. Please deploy your API before migration"* | Deploy the API in APIM Console, click **Refresh**, then migrate again, or tick **Force migration**. |
-| SSL certificate errors | For self-signed certificates outside production, untick **Verify SSL certificates** in Connection or set `GRAVITEE_VERIFY_SSL=false`. |
+| SSL certificate errors | For self-signed certificates outside production, untick **Verify SSL certificates** in Connection. |
+| Server errors (HTTP 5xx) or timeouts from a slow Gravitee | Raise **Retry attempts** and **Retry delay** in Connection › Advanced settings. With many APIs, a smaller **Page size** makes each listing request lighter. |
 | A migration shows *Interrupted* | The container stopped during the migration. Check the APIs in APIM Console, then migrate the remaining ones again. |
-| Port 8080 already in use | Set `UI_PORT` in `.env`, e.g. `UI_PORT=8090`, then `docker compose up -d ui`. |
+| Port 8080 already in use | Edit `UI_PORT` in `.env`, e.g. `UI_PORT=8090`, then run `docker compose up -d ui` (see [Changing the port](#changing-the-port-env)). |
 
 To see the server output:
 

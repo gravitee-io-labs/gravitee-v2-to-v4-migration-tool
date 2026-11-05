@@ -54,66 +54,36 @@ ACTIVE = {"id": None}
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-# Non-secret settings (URL, org, env, SSL, tuning) come from .env, mounted
-# read-only by docker compose and re-read on every use.
+# All connection settings are entered in the Connection page and sent with
+# each request; the browser remembers the non-secret ones. Nothing is read
+# from .env, which only sets the port the UI is published on (docker compose).
 #
-# Credentials are NEVER read from .env or from the environment: the token, or
-# the username and password, are typed in the Connection page and sent with
-# each request. They are only kept in memory for the duration of a request or
-# passed to the migration process that needs them.
-SETTINGS_FILE = os.environ.get("GRAVITEE_SETTINGS_FILE", "")
+# Credentials (token, or username and password) are never stored: they are
+# only kept in memory for the duration of a request, or handed to the
+# migration process that needs them.
 CREDENTIAL_KEYS = ("GRAVITEE_TOKEN", "GRAVITEE_USERNAME", "GRAVITEE_PASSWORD")
 
-
-def read_settings_file():
-    values = {}
-    if not SETTINGS_FILE or not os.path.isfile(SETTINGS_FILE):
-        return values
-    with open(SETTINGS_FILE, encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            if key.startswith("export "):
-                key = key[7:].strip()
-            if key in CREDENTIAL_KEYS:
-                values[key] = "<ignored>" if value.strip() else ""  # never keep the value
-                continue
-            value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            elif " #" in value:
-                value = value.split(" #", 1)[0].rstrip()
-            values[key] = value
-    return values
-
-
-def setting(values, key, default):
-    """Value from the settings file, then the process environment, then default."""
-    return values.get(key) or os.environ.get(key) or default
-
-
-def ignored_credentials():
-    """Credential variables still present in .env or the environment (ignored)."""
-    v = read_settings_file()
-    return [k for k in CREDENTIAL_KEYS if v.get(k) or os.environ.get(k)]
+# Advanced settings of the Connection page: default, minimum, maximum, label.
+ADVANCED = {
+    "retry_attempts": (3, 1, 10, "Retry attempts"),
+    "retry_delay_s":  (2, 0, 60, "Retry delay (seconds)"),
+    "page_size":      (100, 1, 1000, "Page size"),
+}
 
 
 def env_defaults():
-    v = read_settings_file()
+    """Built-in defaults of the Connection page."""
     return {
-        "base_url":   setting(v, "GRAVITEE_BASE_URL", "http://localhost:8083"),
-        "org_id":     setting(v, "GRAVITEE_ORG_ID", "DEFAULT"),
-        "env_id":     setting(v, "GRAVITEE_ENV_ID", "DEFAULT"),
+        # From inside Docker, the host machine (where Gravitee usually runs
+        # during a migration) is host.docker.internal.
+        "base_url":   "http://host.docker.internal:8083",
+        "org_id":     "DEFAULT",
+        "env_id":     "DEFAULT",
         "token":      "",
         "username":   "",
         "password":   "",
-        "verify_ssl": setting(v, "GRAVITEE_VERIFY_SSL", "true").lower() == "true",
-        "retry_attempts": int(setting(v, "GRAVITEE_RETRY_ATTEMPTS", "3")),
-        "retry_delay_s":  int(setting(v, "GRAVITEE_RETRY_DELAY_S", "2")),
-        "page_size":      int(setting(v, "GRAVITEE_PAGE_SIZE", "100")),
+        "verify_ssl": True,
+        **{key: spec[0] for key, spec in ADVANCED.items()},
     }
 
 
@@ -123,7 +93,7 @@ def public_defaults():
     return {
         "base_url": d["base_url"], "org_id": d["org_id"], "env_id": d["env_id"],
         "verify_ssl": d["verify_ssl"],
-        "ignored_credentials": ignored_credentials(),
+        **{key: spec[0] for key, spec in ADVANCED.items()},
     }
 
 
@@ -136,6 +106,17 @@ def resolve_config(payload):
         value = str(payload.get(key) or "").strip()
         if value:
             cfg[key] = value
+    for key, (default, low, high, label) in ADVANCED.items():
+        raw = payload.get(key)
+        if raw in (None, ""):
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            raise ValueError(f"{label} must be a whole number.")
+        if not low <= value <= high:
+            raise ValueError(f"{label} must be between {low} and {high}.")
+        cfg[key] = value
     if "verify_ssl" in payload:
         cfg["verify_ssl"] = bool(payload["verify_ssl"])
     if payload.get("auth_mode") == "basic":

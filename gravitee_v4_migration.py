@@ -4,13 +4,14 @@ import urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 # ===========================================================================
-# CONFIG - connection settings are read from environment variables (.env).
-# Credentials are never read from .env or the environment: the web interface
-# sends them on stdin (--credentials-stdin), and on the command line the script
-# asks for them (see ask_credentials).
+# CONFIG - when run by the web interface, the connection settings come from
+# its Connection page (environment variables set for this process) and the
+# credentials on stdin (--credentials-stdin). On the command line, the script
+# asks for all of them (see ask_settings and ask_credentials).
+# Credentials are never read from .env or the environment.
 # ===========================================================================
 CONFIG = {
-    "base_url":       os.environ.get("GRAVITEE_BASE_URL",       "http://localhost:8083"),
+    "base_url":       os.environ.get("GRAVITEE_BASE_URL",       "http://host.docker.internal:8083"),
     "org_id":         os.environ.get("GRAVITEE_ORG_ID",         "DEFAULT"),
     "env_id":         os.environ.get("GRAVITEE_ENV_ID",         "DEFAULT"),
     "token":          "",
@@ -382,12 +383,22 @@ def read_credentials_stdin(cfg):
         sys.exit("No credentials received.")
 
 
+def ask_settings(cfg):
+    """Prompt for the connection settings (command-line use). Enter keeps the default."""
+    def ask(label, current):
+        answer = input(f"{label} [{current}]: ").strip()
+        return answer or current
+    cfg["base_url"] = ask("Management API URL", cfg["base_url"]).rstrip("/")
+    if not cfg["base_url"].startswith(("http://", "https://")):
+        sys.exit("The URL must start with http:// or https://")
+    cfg["org_id"] = ask("Organization ID", cfg["org_id"])
+    cfg["env_id"] = ask("Environment ID", cfg["env_id"])
+    ssl_answer = ask("Verify SSL certificates (y/n)", "y" if cfg["verify_ssl"] else "n")
+    cfg["verify_ssl"] = ssl_answer.lower() not in ("n", "no", "false", "0")
+
+
 def ask_credentials(cfg):
     """Prompt for credentials (command-line use)."""
-    if not sys.stdin.isatty():
-        sys.exit("No credentials provided. Run interactively to be prompted, "
-                 "or use the web interface.")
-    print(f"Gravitee Management API: {cfg['base_url']}  (org {cfg['org_id']}, env {cfg['env_id']})")
     token = getpass.getpass("Personal access token (leave empty to use username/password): ").strip()
     if token:
         cfg["token"] = token
@@ -412,6 +423,10 @@ def main():
     if args.credentials_stdin:
         read_credentials_stdin(CONFIG)
     else:
+        if not sys.stdin.isatty():
+            sys.exit("Run this command in an interactive terminal: it asks for the "
+                     "connection settings and credentials. Or use the web interface.")
+        ask_settings(CONFIG)
         ask_credentials(CONFIG)
     client = GraviteeClient(CONFIG)
     if args.command == "generate":

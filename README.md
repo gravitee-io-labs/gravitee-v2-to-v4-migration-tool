@@ -4,6 +4,8 @@ A web interface to migrate **Gravitee APIM** APIs from the V2 definition to V4. 
 
 It runs in a single Docker container, and only uses the Python standard library.
 
+> **Migrating a few APIs?** You can also migrate an API directly from the APIM Console, one API at a time. See the Gravitee documentation: [Migrate APIs](https://documentation.gravitee.io/apim/create-and-configure-apis/create-apis/migrate-apis). This tool uses the same Management API migration endpoint, and adds bulk selection, CSV import, deploy and restart, and an audit trail of every run.
+
 ![V2 APIs list](docs/screenshots/01-v2-apis.png)
 
 ## Features

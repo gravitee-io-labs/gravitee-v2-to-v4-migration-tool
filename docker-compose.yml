@@ -1,0 +1,69 @@
+services:
+
+  # ── Web interface (recommended) ───────────────────────────────────────────
+  # Usage: docker compose up -d ui      then open http://localhost:8080
+  #
+  # Lists the V2 APIs, lets you tick the ones to migrate (or all of them)
+  # and runs gravitee_v4_migration.py on the selection. Base URL, org and env
+  # are pre-filled from .env and editable in the UI.
+  #
+  # .env holds only non-secret settings (URL, org, env, SSL). It is mounted
+  # read-only and read by the app. Credentials are typed in the Connection
+  # page and never stored.
+  ui:
+    build: .
+    image: gravitee-migration:latest
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    environment:
+      WEB_PORT: "8080"
+      GRAVITEE_SETTINGS_FILE: /config/gravitee.env
+    volumes:
+      - ./data:/data
+      - type: bind
+        source: ./.env
+        target: /config/gravitee.env
+        read_only: true
+        bind:
+          create_host_path: false   # fail clearly if .env is missing (cp .env.example .env)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach a Gravitee running on the host (Linux)
+    networks:
+      - gravitee_net
+    restart: unless-stopped
+
+  # ── CLI step 1: generate the input CSV ────────────────────────────────────
+  # Usage: docker compose run --rm generate   (asks for the token or username/password)
+  generate:
+    build: .
+    image: gravitee-migration:latest
+    command: ["python3", "gravitee_v4_migration.py", "generate"]
+    env_file: .env
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - gravitee_net
+    profiles: ["cli"]
+
+  # ── CLI step 2: run the migration from ./data/migration_input.csv ─────────
+  # Usage: docker compose run --rm migrate    (asks for the token or username/password)
+  migrate:
+    build: .
+    image: gravitee-migration:latest
+    command: ["python3", "gravitee_v4_migration.py", "migrate"]
+    env_file: .env
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - gravitee_net
+    profiles: ["cli"]
+
+networks:
+  # Change to "external: true" and set the name if Gravitee is running in
+  # its own compose project and you want direct container-to-container access.
+  gravitee_net:
+    driver: bridge

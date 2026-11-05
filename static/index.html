@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V4 Migration</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d9412e'/%3E%3Cpath d='M9 12h11l-3-3M23 20H12l3 3' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f6f2ed;
+  --sidebar: #f9f6f2;
+  --surface: #ffffff;
+  --surface-2: #faf7f3;
+  --hover: #f7f2ed;
+  --border: #ebe4dc;
+  --border-strong: #dcd3c9;
+  --text: #1d1916;
+  --muted: #6e655e;
+  --faint: #9d948c;
+  --accent: #d9412e;
+  --accent-hover: #c23524;
+  --accent-soft: #fbdfd9;
+  --accent-text: #a8301f;
+  --ok: #2f8a46;
+  --ok-soft: #e3f3e6;
+  --warn: #c2700c;
+  --warn-soft: #fcefd8;
+  --err: #c93a2b;
+  --err-soft: #fbe4e0;
+  --neutral-soft: #f1ece6;
+  --dot-off: #9b938c;
+  --console-bg: #1f1b18;
+  --console-text: #e8e1d9;
+  --shadow: 0 1px 2px rgba(45, 30, 20, .04), 0 2px 6px rgba(45, 30, 20, .04);
+  --overlay: rgba(30, 22, 16, .35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161311; --sidebar: #1a1715; --surface: #211d1a; --surface-2: #1d1a17; --hover: #2a2522;
+    --border: #322c28; --border-strong: #423a35; --text: #f1ece6; --muted: #aaa097; --faint: #7d746d;
+    --accent: #e5553f; --accent-hover: #f06a55; --accent-soft: #3d2420; --accent-text: #f4a091;
+    --ok: #5cc277; --ok-soft: #1f3324; --warn: #e9a23b; --warn-soft: #3a2c16; --err: #f07466; --err-soft: #3d221e;
+    --neutral-soft: #2b2622; --dot-off: #7d746d; --console-bg: #110f0d; --console-text: #e8e1d9;
+    --shadow: 0 1px 2px rgba(0,0,0,.3); --overlay: rgba(0,0,0,.55); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161311; --sidebar: #1a1715; --surface: #211d1a; --surface-2: #1d1a17; --hover: #2a2522;
+  --border: #322c28; --border-strong: #423a35; --text: #f1ece6; --muted: #aaa097; --faint: #7d746d;
+  --accent: #e5553f; --accent-hover: #f06a55; --accent-soft: #3d2420; --accent-text: #f4a091;
+  --ok: #5cc277; --ok-soft: #1f3324; --warn: #e9a23b; --warn-soft: #3a2c16; --err: #f07466; --err-soft: #3d221e;
+  --neutral-soft: #2b2622; --dot-off: #7d746d; --console-bg: #110f0d; --console-text: #e8e1d9;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); --overlay: rgba(0,0,0,.55); color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent-text); }
+.app { display: grid; grid-template-columns: 216px 1fr; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  background: var(--sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 14px 8px 12px; position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px 18px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.brand-name { font-weight: 650; font-size: 14.5px; line-height: 1.1; }
+.brand-sub { color: var(--muted); font-size: 12px; }
+.nav-label { color: var(--muted); font-size: 12px; padding: 14px 10px 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; cursor: pointer;
+  padding: 7px 10px; border-radius: 7px; font-weight: 500; text-align: left; color: var(--text);
+}
+.nav-item svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.nav-item:hover { background: var(--hover); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.nav-item.active svg { color: var(--accent-text); }
+.nav-item .count { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500; }
+.nav-item .live-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); animation: pulse 1.2s infinite; }
+.sidebar-foot { margin-top: auto; padding: 0 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 550; max-width: 100%; }
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.err { background: var(--err-soft); color: var(--err); }
+.pill.idle { background: var(--neutral-soft); color: var(--muted); }
+.pill.busy { background: var(--warn-soft); color: var(--warn); }
+.foot-actions { display: flex; gap: 4px; margin-top: 14px; }
+.icon-btn { border: 0; background: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--muted); display: grid; place-items: center; }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* Main */
+.main { padding: 24px 24px 48px; min-width: 0; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; min-height: 34px; }
+.page-head h1 { font-size: 20px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.page-head .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border-strong); background: var(--surface);
+  border-radius: 7px; padding: 6px 12px; font-weight: 550; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow);
+  color: var(--text); text-decoration: none;
+}
+.btn[hidden] { display: none; }
+.btn svg { width: 14px; height: 14px; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn.ghost { border-color: transparent; box-shadow: none; background: none; }
+.btn.sm { padding: 4px 10px; font-size: 12.5px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 16px; }
+.card-pad { padding: 20px; }
+.card-title { font-weight: 650; font-size: 14.5px; margin: 0 0 4px; }
+.card-sub { color: var(--muted); margin: 0 0 16px; }
+
+.toolbar { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.search { position: relative; flex: 1 1 260px; }
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); }
+.input, .select {
+  width: 100%; border: 1px solid var(--border-strong); background: var(--surface); border-radius: 7px; padding: 7px 10px; outline: none;
+}
+.search .input { padding-left: 30px; }
+.input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.select { width: auto; min-width: 170px; padding-right: 28px; appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239d948c' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; }
+.chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: var(--neutral-soft); border-radius: 7px; padding: 6px 11px; cursor: pointer; font-weight: 550; user-select: none; }
+.chip input { margin: 0; accent-color: var(--accent); }
+
+.selection-bar { display: flex; align-items: center; gap: 12px; padding: 9px 16px; background: var(--accent-soft); color: var(--accent-text); border-bottom: 1px solid var(--border); font-weight: 550; flex-wrap: wrap; }
+.selection-bar .link { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; font-weight: 550; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 550; color: var(--muted); font-size: 12.5px; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.row:hover td { background: var(--surface-2); }
+tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.cb { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; margin: 0; vertical-align: middle; }
+.col-cb { width: 40px; padding-right: 0; }
+.col-exp { width: 28px; padding: 0 0 0 4px; }
+.exp-btn { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 5px; display: grid; place-items: center; }
+.exp-btn svg { width: 14px; height: 14px; transition: transform .15s; }
+.exp-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
+.api-name { font-weight: 600; }
+.api-desc { color: var(--muted); font-size: 12.5px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 440px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.muted { color: var(--muted); }
+.center { text-align: center; }
+.state { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); white-space: nowrap; }
+.state .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off); }
+.state.on .dot { background: var(--ok); }
+.state.on { color: var(--text); }
+.detail-row td { background: var(--surface-2); padding: 12px 16px 14px 92px; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 24px; }
+.kv dt { color: var(--muted); font-size: 12px; }
+.kv dd { margin: 1px 0 0; word-break: break-all; }
+
+.badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.err { background: var(--err-soft); color: var(--err); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.neutral { background: var(--neutral-soft); color: var(--muted); }
+.badge.run { background: var(--warn-soft); color: var(--warn); }
+.spinner { width: 11px; height: 11px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+.err-text { color: var(--err); font-size: 12px; margin-top: 3px; }
+.skip-text { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+.empty { padding: 56px 20px; text-align: center; color: var(--muted); }
+.empty h3 { color: var(--text); margin: 10px 0 4px; font-size: 15px; }
+.empty svg { width: 28px; height: 28px; color: var(--faint); }
+.empty .btn { margin-top: 14px; }
+
+.banner { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid; }
+.banner svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.banner.err { background: var(--err-soft); color: var(--err); border-color: color-mix(in srgb, var(--err) 25%, transparent); }
+.banner.ok-banner { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
+.banner.info { background: var(--surface); color: var(--text); border-color: var(--border); }
+.banner.info svg { color: var(--accent); }
+.banner.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
+.banner .b-title { font-weight: 650; }
+.banner .b-body { color: var(--text); opacity: .85; word-break: break-word; }
+
+/* Forms */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field label { display: block; font-weight: 600; margin-bottom: 5px; }
+.field .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.field .env { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--faint); font-weight: 500; margin-left: 6px; }
+.field.full { grid-column: 1 / -1; }
+.input-group { display: flex; }
+.input.secret { -webkit-text-security: disc; }
+.input.secret.revealed { -webkit-text-security: none; }
+.input-group .input { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.input-group .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; box-shadow: none; }
+.segmented { display: inline-flex; background: var(--neutral-soft); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.segmented button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 550; color: var(--muted); }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.check-row { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check-row input { margin-top: 3px; }
+.check-row .t { font-weight: 600; }
+.check-row .d { color: var(--muted); font-size: 12.5px; }
+.form-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.divider { grid-column: 1 / -1; border-top: 1px solid var(--border); margin: 4px 0; }
+
+/* Audit */
+.col-dl { width: 44px; text-align: right; }
+
+/* Documentation */
+.doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+.doc-toc { position: sticky; top: 16px; padding: 8px; display: flex; flex-direction: column; }
+.doc-toc a { color: var(--text); text-decoration: none; padding: 6px 10px; border-radius: 6px; font-weight: 500; }
+.doc-toc a:hover { background: var(--hover); }
+.doc { max-width: 860px; }
+.doc section { scroll-margin-top: 16px; }
+.doc h2 { font-size: 16px; margin: 0 0 10px; font-weight: 650; }
+.doc h3 { font-size: 13.5px; margin: 18px 0 8px; font-weight: 650; }
+.doc p, .doc li { line-height: 1.6; }
+.doc p { margin: 8px 0; }
+.doc ol, .doc ul { margin: 8px 0; padding-left: 20px; }
+.doc li { margin: 4px 0; }
+.doc code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--neutral-soft); padding: 1px 5px; border-radius: 4px; }
+.doc-code { background: var(--console-bg); color: var(--console-text); border-radius: 9px; padding: 12px 14px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; margin: 8px 0 12px; }
+.doc-table { margin: 6px 0; border: 1px solid var(--border); border-radius: 9px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+.doc-table td { vertical-align: top; font-size: 13px; }
+.doc-dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 8px 0; }
+.doc-dl dt { font-weight: 600; }
+.doc-dl dd { margin: 0; color: var(--muted); line-height: 1.55; }
+.doc-note { background: var(--warn-soft); color: var(--warn); border-radius: 9px; padding: 10px 12px; margin-top: 12px; font-size: 12.5px; }
+.doc .btn { margin-top: 6px; }
+@media (max-width: 860px) {
+  .doc-layout { grid-template-columns: 1fr; }
+  .doc-toc { position: static; flex-direction: row; flex-wrap: wrap; }
+  .doc-dl { grid-template-columns: 1fr; }
+  .doc-dl dd { margin-bottom: 6px; }
+}
+.progress { height: 6px; background: var(--neutral-soft); border-radius: 999px; overflow: hidden; }
+.progress > div { height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+.progress.done > div { background: var(--ok); }
+.progress.failed > div { background: var(--err); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+.stat .label { color: var(--muted); font-size: 12.5px; }
+.stat .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat .value small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.stat .value.err { color: var(--err); }
+.run-meta { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+.run-meta b { color: var(--text); font-weight: 550; }
+.console {
+  background: var(--console-bg); color: var(--console-text); border-radius: 0 0 12px 12px; padding: 12px 14px; margin: 0;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+}
+.console .l-err { color: #ff8f80; }
+.console .l-warn { color: #f2bd63; }
+.console .l-ok { color: #7fd894; }
+.card-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
+.card-head h2 { font-size: 14px; margin: 0; font-weight: 650; }
+.clickable { cursor: pointer; }
+
+/* Modal */
+.overlay { position: fixed; inset: 0; background: var(--overlay); display: grid; place-items: center; padding: 16px; z-index: 50; animation: fade .12s; }
+.modal { background: var(--surface); border-radius: 14px; width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25); border: 1px solid var(--border); }
+.modal-head { padding: 18px 20px 6px; }
+.modal-head h2 { margin: 0; font-size: 17px; font-weight: 650; }
+.modal-body { padding: 8px 20px 4px; overflow: auto; }
+.modal-foot { padding: 14px 20px 18px; display: flex; justify-content: flex-end; gap: 8px; }
+.api-list { border: 1px solid var(--border); border-radius: 9px; max-height: 190px; overflow: auto; margin: 10px 0 16px; }
+.api-list > div { align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; }
+.api-list > div:last-child { border-bottom: 0; }
+.api-list-meta { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; font-size: 12.5px; }
+.opts { display: grid; gap: 12px; margin-bottom: 14px; }
+.target { background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font-size: 12.5px; color: var(--muted); }
+.target b { color: var(--text); font-weight: 600; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 9px; font-weight: 550; box-shadow: 0 8px 30px rgba(0,0,0,.2); z-index: 60; animation: fade .15s; max-width: calc(100vw - 40px); }
+
+.skeleton { height: 12px; border-radius: 4px; background: linear-gradient(90deg, var(--neutral-soft), var(--hover), var(--neutral-soft)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: .35; } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.col-path { white-space: nowrap; }
+.col-mig { min-width: 150px; }
+.warn-text { color: var(--warn); }
+.mig-reason { color: var(--err); font-size: 12px; margin-top: 3px; max-width: 240px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+@media (max-width: 1500px) { .col-path { display: none; } .api-desc { max-width: 320px; } }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .brand { padding: 0 8px 0 0; }
+  .nav-label { display: none; }
+  .nav-item { width: auto; }
+  .sidebar-foot { margin: 0 0 0 auto; display: flex; align-items: center; gap: 4px; }
+  .foot-actions { margin: 0; }
+  .main { padding: 16px 16px 40px; }
+  .form-grid, .stats { grid-template-columns: 1fr 1fr; }
+  .detail-row td { padding-left: 16px; }
+  .col-version, .col-life, .col-path { display: none; }
+}
+@media (max-width: 520px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .sidebar-foot .pill { display: none; }
+  .select { min-width: 0; flex: 1; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h12l-3.5-3.5M19 15H7l3.5 3.5"/></svg>
+      </div>
+      <div><div class="brand-name">Gravitee</div><div class="brand-sub">V4 Migration</div></div>
+    </div>
+    <div class="nav-label">Migrate</div>
+    <button class="nav-item" data-view="apis">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+      V2 APIs <span class="count" id="nav-api-count"></span>
+    </button>
+    <div class="nav-label">Audit</div>
+    <button class="nav-item" data-view="runs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+      Logs <span id="nav-run-flag"></span>
+    </button>
+    <div class="nav-label">Configure</div>
+    <button class="nav-item" data-view="connection">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0V7ZM12 16v5"/></svg>
+      Connection
+    </button>
+    <div class="nav-label">Help</div>
+    <button class="nav-item" data-view="help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13ZM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5v-13Z"/></svg>
+      Documentation
+    </button>
+    <div class="sidebar-foot">
+      <div id="conn-pill" class="pill idle"><span class="dot"></span><span>Not connected</span></div>
+      <div class="foot-actions">
+        <button class="icon-btn" id="theme-btn" title="Toggle theme" aria-label="Toggle theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- helpers ----------
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  async function request(method, url, body) {
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+  const icon = {
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l11-7z"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
+    upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0-4 4m4-4 4 4M5 20h14"/></svg>',
+    help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>',
+    plug: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0V7ZM12 16v5"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>',
+  };
+  function toast(msg) {
+    const el = document.createElement("div");
+    el.className = "toast"; el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3200);
+  }
+  function fmtDate(v) {
+    if (!v) return "—";
+    const d = typeof v === "number" ? new Date(v) : new Date(v);
+    return isNaN(d) ? String(v) : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function titleCase(s) { s = String(s || ""); return s ? s.charAt(0) + s.slice(1).toLowerCase() : "—"; }
+
+  // Secret fields are plain text inputs masked with CSS, so browsers and
+  // password managers do not offer to save them. Browsers without the CSS
+  // masking fall back to a password input.
+  const SECRET_TYPE = CSS.supports("-webkit-text-security", "disc") ? "text" : "password";
+  // Drop the username saved by earlier versions.
+  try { const c = JSON.parse(localStorage.getItem("gvm.conn") || "{}"); if ("username" in c) { delete c.username; localStorage.setItem("gvm.conn", JSON.stringify(c)); } } catch {}
+
+  // ---------- state ----------
+  const saved = store.get("gvm.conn", {});
+  const state = {
+    view: "apis",
+    defaults: null,
+    conn: { base_url: "", org_id: "", env_id: "", token: "", auth_mode: "token", username: "", password: "", verify_ssl: true },
+    connStatus: "idle", // idle | loading | ok | error
+    connError: "",
+    apis: [], meta: null, loaded: false,
+    selected: new Set(), expanded: new Set(),
+    q: "", stateFilter: "all", selectedOnly: false,
+    runs: [], activeRun: null,
+    runId: null, run: null, runLines: [], pollTimer: null,
+  };
+
+  // ---------- connection ----------
+  function hasCredentials() {
+    const c = state.conn;
+    return c.auth_mode === "basic" ? !!(c.username && c.password) : !!c.token;
+  }
+  function connPayload() {
+    const c = state.conn;
+    return { base_url: c.base_url, org_id: c.org_id, env_id: c.env_id, auth_mode: c.auth_mode,
+             token: c.auth_mode === "token" ? c.token : "", username: c.username,
+             password: c.auth_mode === "basic" ? c.password : "", verify_ssl: c.verify_ssl };
+  }
+  function persistConn() {
+    const { base_url, org_id, env_id, auth_mode, verify_ssl } = state.conn;
+    // Only non-sensitive settings are kept in the browser: no token, password or username.
+    store.set("gvm.conn", { base_url, org_id, env_id, auth_mode, verify_ssl });
+  }
+  function updatePill() {
+    const pill = $("#conn-pill");
+    const map = {
+      idle: ["idle", "Not connected"],
+      loading: ["busy", "Connecting…"],
+      ok: ["ok", `Connected · ${state.conn.env_id || "DEFAULT"}`],
+      error: ["err", "Connection error"],
+    };
+    let [cls, text] = map[state.connStatus];
+    if (state.activeRun) { cls = "busy"; text = "Migration running"; }
+    pill.className = "pill " + cls;
+    pill.innerHTML = `<span class="dot"></span><span>${esc(text)}</span>`;
+    pill.title = state.connStatus === "error" ? state.connError : (state.conn.base_url || "");
+    $("#nav-api-count").textContent = state.loaded ? state.apis.length : "";
+    $("#nav-run-flag").className = state.activeRun ? "live-dot" : "";
+  }
+
+  async function loadApis({ quiet = false } = {}) {
+    if (!hasCredentials()) {
+      state.connStatus = "idle"; updatePill();
+      if (state.view === "apis") renderApis();
+      return false;
+    }
+    state.connStatus = "loading"; updatePill();
+    if (!quiet && state.view === "apis") renderApis();
+    try {
+      const data = await request("POST", "/api/apis", connPayload());
+      state.apis = data.apis; state.meta = data; state.loaded = true;
+      state.connStatus = "ok"; state.connError = "";
+      const ids = new Set(state.apis.map((a) => a.id));
+      state.selected = new Set([...state.selected].filter((id) => ids.has(id)));
+    } catch (e) {
+      state.connStatus = "error"; state.connError = e.message;
+    }
+    updatePill();
+    if (state.view === "apis") renderApis();
+    return state.connStatus === "ok";
+  }
+
+  // ---------- navigation ----------
+  function setView(view, opts = {}) {
+    state.view = view;
+    if (view !== "run") stopPolling();
+    $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === (view === "run" ? "runs" : view)));
+    if (view === "apis") renderApis();
+    if (view === "connection") renderConnection();
+    if (view === "help") renderHelp(opts.section);
+    if (view === "runs") { renderRuns(); loadRuns(); }
+    if (view === "run") openRun(opts.id);
+    window.scrollTo(0, 0);
+  }
+  $$(".nav-item").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+
+  // ---------- V2 APIs view ----------
+  function filteredApis() {
+    const q = state.q.trim().toLowerCase();
+    return state.apis.filter((a) => {
+      if (state.selectedOnly && !state.selected.has(a.id)) return false;
+      if (state.stateFilter === "FAILED") { if (a.last_migration?.status !== "FAILED") return false; }
+      else if (state.stateFilter === "NEVER") { if (a.last_migration) return false; }
+      else if (state.stateFilter === "UNSYNCED") { if (!isUnsynced(a)) return false; }
+      else if (state.stateFilter !== "all" && String(a.state).toUpperCase() !== state.stateFilter) return false;
+      if (!q) return true;
+      return [a.name, a.id, a.description, a.context_path, a.version].some((v) => String(v || "").toLowerCase().includes(q));
+    });
+  }
+
+  function renderApis() {
+    const main = $("#main");
+    const m = state.meta;
+    const others = m ? Object.entries(m.other_versions || {}).map(([k, v]) => `${v} ${k}`).join(", ") : "";
+    const sub = state.loaded
+      ? `${state.apis.length} V2 API${state.apis.length === 1 ? "" : "s"} in <b>${esc(state.conn.org_id)}</b> / <b>${esc(state.conn.env_id)}</b>${others ? ` · ${esc(others)} not shown` : ""}`
+      : `Select the V2 APIs to migrate to the V4 definition`;
+    main.innerHTML = `
+      <div class="page-head">
+        <div><h1>V2 APIs</h1><div class="sub">${sub}</div></div>
+        <div class="actions">
+          <button class="btn" id="refresh-btn" ${state.connStatus === "loading" ? "disabled" : ""}>${icon.refresh} Refresh</button>
+          <button class="btn" id="import-btn" ${state.loaded && state.apis.length ? "" : "disabled"} title="Select the APIs listed in a CSV file">${icon.upload} Import CSV</button>
+          <input type="file" id="import-file" accept=".csv,.txt,text/csv,text/plain" hidden>
+          <button class="btn primary" id="migrate-btn" disabled>${icon.play} Migrate selected</button>
+        </div>
+      </div>
+      <div id="apis-banner"></div>
+      <div class="card" id="apis-card"></div>`;
+    $("#refresh-btn").onclick = () => loadApis();
+    $("#import-btn").onclick = () => $("#import-file").click();
+    $("#import-file").onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      try { applyImport(file.name, await file.text()); }
+      catch (err) { state.importResult = { file: file.name, error: err.message }; renderApis(); }
+    };
+    $("#migrate-btn").onclick = openMigrateModal;
+
+    const banner = $("#apis-banner");
+    if (state.connStatus === "error") {
+      banner.innerHTML = `<div class="banner err">${icon.alert}<div><div class="b-title">Could not load APIs</div>
+        <div class="b-body">${esc(state.connError)}</div>
+        <div style="margin-top:8px"><button class="btn sm" id="go-conn">Check connection settings</button></div></div></div>`;
+      $("#go-conn").onclick = () => setView("connection");
+    }
+    if (state.activeRun) {
+      banner.insertAdjacentHTML("beforeend", `<div class="banner warn">${icon.alert}<div><div class="b-title">A migration is running</div>
+        <div class="b-body">New migrations can start once it finishes. <a href="#" id="go-run">View progress</a></div></div></div>`);
+      $("#go-run").onclick = (e) => { e.preventDefault(); setView("run", { id: state.activeRun }); };
+    }
+    if (state.importResult) banner.insertAdjacentHTML("beforeend", importBanner(state.importResult));
+    const closeImport = $("#import-close");
+    if (closeImport) closeImport.onclick = () => { state.importResult = null; $("#import-banner").remove(); };
+    const importHelp = $("#import-help");
+    if (importHelp) importHelp.onclick = (e) => { e.preventDefault(); setView("help", { section: "csv" }); };
+
+    const card = $("#apis-card");
+    if (state.connStatus === "loading" && !state.loaded) {
+      card.innerHTML = `<div style="padding:18px">${Array.from({ length: 6 }, () => `<div class="skeleton" style="margin:14px 0;width:${40 + Math.random() * 50}%"></div>`).join("")}</div>`;
+      return;
+    }
+    if (!state.loaded) {
+      card.innerHTML = `<div class="empty">${icon.plug}<h3>Connect to your Gravitee APIM</h3>
+        <div>Fill in the management API URL, organization, environment and token to list your V2 APIs.</div>
+        <button class="btn primary" id="empty-conn">Open connection settings</button></div>`;
+      $("#empty-conn").onclick = () => setView("connection");
+      return;
+    }
+    if (!state.apis.length) {
+      card.innerHTML = `<div class="empty">${icon.check}<h3>No V2 APIs left</h3>
+        <div>Every API in this environment already uses a V4 (or other) definition.</div></div>`;
+      updateSelectionUi();
+      return;
+    }
+    card.innerHTML = `
+      <div class="toolbar">
+        <div class="search">${icon.search}<input class="input" id="q" placeholder="Search by name, ID, path…" value="${esc(state.q)}"></div>
+        <select class="select" id="state-filter">
+          <option value="all">All states</option>
+          <option value="STARTED">Started</option>
+          <option value="STOPPED">Stopped</option>
+          <option value="UNSYNCED">Out of sync</option>
+          <option value="FAILED">Migration failed</option>
+          <option value="NEVER">Never migrated</option>
+        </select>
+        <label class="chip"><input type="checkbox" id="sel-only" ${state.selectedOnly ? "checked" : ""}> Selected only</label>
+      </div>
+      <div id="selection-bar"></div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="col-exp"></th>
+          <th class="col-cb"><input type="checkbox" class="cb" id="cb-all" aria-label="Select all visible APIs"></th>
+          <th>API</th><th class="col-version">Version</th><th class="col-path">Context path</th><th class="col-life">Lifecycle</th><th>State</th><th>Deployment</th><th>Last migration</th>
+        </tr></thead>
+        <tbody id="api-rows"></tbody>
+      </table></div>`;
+    $("#state-filter").value = state.stateFilter;
+    $("#q").oninput = (e) => { state.q = e.target.value; renderRows(); };
+    $("#state-filter").onchange = (e) => { state.stateFilter = e.target.value; renderRows(); };
+    $("#sel-only").onchange = (e) => { state.selectedOnly = e.target.checked; renderRows(); };
+    $("#cb-all").onchange = (e) => {
+      const rows = filteredApis();
+      rows.forEach((a) => (e.target.checked ? state.selected.add(a.id) : state.selected.delete(a.id)));
+      renderRows();
+    };
+    const tbody = $("#api-rows");
+    tbody.addEventListener("click", (e) => {
+      const runLink = e.target.closest(".run-link");
+      if (runLink) { e.preventDefault(); setView("run", { id: runLink.dataset.run }); return; }
+      const exp = e.target.closest(".exp-btn");
+      const tr = e.target.closest("tr.row");
+      if (!tr) return;
+      const id = tr.dataset.id;
+      if (exp) { state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id); renderRows(); return; }
+      if (e.target.closest("a, button")) return;
+      if (state.activeRun) return;
+      state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+      renderRows();
+    });
+    renderRows();
+  }
+
+  const SYNC = {
+    IN_SYNC: ["ok", "In sync"],
+    OUT_OF_SYNC: ["warn", "Out of sync"],
+    NEVER_DEPLOYED: ["warn", "Never deployed"],
+    UNKNOWN: ["neutral", "Unknown"],
+  };
+  const isUnsynced = (a) => ["OUT_OF_SYNC", "NEVER_DEPLOYED"].includes(a.sync?.state);
+  const syncLabel = (sync) => (SYNC[sync?.state] || SYNC.UNKNOWN)[1];
+  function syncCell(sync) {
+    const [cls, label] = SYNC[sync?.state] || SYNC.UNKNOWN;
+    const tip = sync?.state === "IN_SYNC" ? "The deployed version matches the API definition"
+      : sync?.state === "OUT_OF_SYNC" ? "The API has changes that are not deployed. Gravitee will refuse to migrate it unless forced."
+      : sync?.state === "NEVER_DEPLOYED" ? "The API has never been deployed. Gravitee will refuse to migrate it unless forced."
+      : (sync?.error || "Could not read the deployment state");
+    return `<span class="badge ${cls}" title="${esc(tip)}">${label}</span>`;
+  }
+  function migShortReason(err) {
+    // "Not migrated (can be forced): This API is out of sync. ..." -> "This API is out of sync. ..."
+    const i = String(err || "").indexOf(": ");
+    return i > -1 ? err.slice(i + 2) : String(err || "");
+  }
+  function migCell(m) {
+    if (!m) return `<span class="muted">Never migrated</span>`;
+    if (m.status === "RUNNING") return `<span class="badge run"><span class="spinner"></span>Running</span>`;
+    if (m.status === "SUCCESS") return `<span class="badge warn" title="The last run reported success but Gravitee still lists this API as V2">Still V2</span>`;
+    const forceable = /can be forced/i.test(m.error);
+    return `<span class="badge err">Failed</span>${forceable ? ` <span class="badge neutral">Can be forced</span>` : ""}
+      <div class="mig-reason" title="${esc(m.error)}">${esc(migShortReason(m.error) || "No reason returned")}</div>`;
+  }
+  function migDetail(m) {
+    if (!m) return "";
+    const label = m.status === "FAILED" ? "Failed" : m.status === "RUNNING" ? "Running" : "Reported success, still V2";
+    return `<div style="grid-column:1/-1"><dt>Last migration attempt</dt><dd style="word-break:normal">
+      <b>${label}</b> · ${esc(fmtDate(m.at))}${m.force ? " · force mode" : ""} · <a href="#" class="run-link" data-run="${esc(m.run_id)}">View run</a>
+      ${m.error ? `<div class="err-text" style="font-size:12.5px">${esc(m.error)}</div>` : ""}</dd></div>`;
+  }
+
+  function renderRows() {
+    const tbody = $("#api-rows");
+    if (!tbody) return;
+    const rows = filteredApis();
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty" style="padding:36px">No API matches these filters.</div></td></tr>`;
+    } else {
+      tbody.innerHTML = rows.map((a) => {
+        const sel = state.selected.has(a.id);
+        const open = state.expanded.has(a.id);
+        const on = String(a.state).toUpperCase() === "STARTED";
+        const row = `<tr class="row clickable ${sel ? "is-selected" : ""}" data-id="${esc(a.id)}">
+          <td class="col-exp"><button class="exp-btn" aria-expanded="${open}" aria-label="Show details">${icon.chevron}</button></td>
+          <td class="col-cb"><input type="checkbox" class="cb" ${sel ? "checked" : ""} ${state.activeRun ? "disabled" : ""} aria-label="Select ${esc(a.name)}"></td>
+          <td><div class="api-name">${esc(a.name || a.id)}</div>${a.description ? `<div class="api-desc">${esc(a.description)}</div>` : ""}</td>
+          <td class="col-version muted">${esc(a.version || "—")}</td>
+          <td class="col-path mono muted">${esc(a.context_path || "—")}</td>
+          <td class="col-life muted">${esc(titleCase(a.lifecycle_state))}</td>
+          <td><span class="state ${on ? "on" : ""}"><span class="dot"></span>${on ? "Started" : titleCase(a.state) === "—" ? "Unknown" : titleCase(a.state)}</span></td>
+          <td>${syncCell(a.sync)}</td>
+          <td class="col-mig">${migCell(a.last_migration)}</td>
+        </tr>`;
+        const detail = open ? `<tr class="detail-row"><td colspan="9"><dl class="kv">
+          <div><dt>API ID</dt><dd class="mono">${esc(a.id)}</dd></div>
+          <div><dt>Owner</dt><dd>${esc(a.owner || "—")}</dd></div>
+          <div><dt>Visibility</dt><dd>${esc(titleCase(a.visibility))}</dd></div>
+          <div><dt>Last updated</dt><dd>${esc(fmtDate(a.updated_at))}</dd></div>
+          <div><dt>Deployment</dt><dd>${esc(syncLabel(a.sync))}${a.sync?.deployed_at ? ` · last deployed ${esc(fmtDate(a.sync.deployed_at))}` : ""}</dd></div>
+          ${isUnsynced(a) ? `<div style="grid-column:1/-1"><dt>Before migrating</dt><dd style="word-break:normal" class="warn-text">${a.sync.state === "NEVER_DEPLOYED" ? "This API has never been deployed." : "This API has changes that are not deployed."} Gravitee will refuse to migrate it until it is deployed in APIM Console, unless you use Force migration.</dd></div>` : ""}
+          ${migDetail(a.last_migration)}
+          ${a.description ? `<div style="grid-column:1/-1"><dt>Description</dt><dd style="word-break:normal">${esc(a.description)}</dd></div>` : ""}
+        </dl></td></tr>` : "";
+        return row + detail;
+      }).join("");
+    }
+    // checkbox inputs toggle through the row click handler; keep them in sync
+    $$("#api-rows .cb").forEach((cb) => cb.addEventListener("click", (e) => e.preventDefault()));
+    updateSelectionUi();
+  }
+
+  function updateSelectionUi() {
+    const rows = filteredApis();
+    const n = state.selected.size;
+    const visibleSel = rows.filter((a) => state.selected.has(a.id)).length;
+    const all = $("#cb-all");
+    if (all) {
+      all.checked = rows.length > 0 && visibleSel === rows.length;
+      all.indeterminate = visibleSel > 0 && visibleSel < rows.length;
+      all.disabled = !!state.activeRun || !rows.length;
+    }
+    const btn = $("#migrate-btn");
+    if (btn) {
+      btn.disabled = n === 0 || !!state.activeRun;
+      btn.innerHTML = `${icon.play} Migrate ${n ? `${n} API${n > 1 ? "s" : ""}` : "selected"}`;
+    }
+    const bar = $("#selection-bar");
+    if (bar) {
+      if (!n) { bar.innerHTML = ""; return; }
+      const total = state.apis.length;
+      bar.innerHTML = `<div class="selection-bar"><span>${n} of ${total} selected</span>
+        ${n < total ? `<button class="link" id="sel-all">Select all ${total}</button>` : ""}
+        <button class="link" id="sel-clear">Clear selection</button></div>`;
+      const sa = $("#sel-all"); if (sa) sa.onclick = () => { state.apis.forEach((a) => state.selected.add(a.id)); renderRows(); };
+      $("#sel-clear").onclick = () => { state.selected.clear(); renderRows(); };
+    }
+  }
+
+  // ---------- CSV import ----------
+  // Parses a CSV (comma or semicolon separated, optional BOM / quotes) into
+  // { header: [...], rows: [[...]] }.
+  function parseCsv(text) {
+    text = text.replace(/^﻿/, "");
+    const firstLine = text.split(/\r?\n/, 1)[0] || "";
+    const delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";"
+      : firstLine.includes("\t") && !firstLine.includes(",") ? "\t" : ",";
+    const rows = [];
+    let row = [], cell = "", quoted = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (c === '"') quoted = false;
+        else cell += c;
+      } else if (c === '"' && cell === "") quoted = true;
+      else if (c === delim) { row.push(cell); cell = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(cell); rows.push(row); row = []; cell = "";
+      } else cell += c;
+    }
+    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+    return rows.map((r) => r.map((v) => v.trim())).filter((r) => r.some((v) => v !== ""));
+  }
+
+  const ID_COLS = ["api_id", "id", "apiid", "api id"];
+  const NAME_COLS = ["api_name", "name", "apiname", "api name"];
+  const FLAG_COLS = ["migrate_to_v4", "migrate"];
+  const isFalse = (v) => ["false", "no", "n", "0", "non", "faux"].includes(String(v).trim().toLowerCase());
+
+  function applyImport(fileName, text) {
+    const rows = parseCsv(text);
+    if (!rows.length) throw new Error("The file is empty.");
+    const head = rows[0].map((h) => h.toLowerCase().replace(/^"|"$/g, ""));
+    const find = (names) => head.findIndex((h) => names.includes(h));
+    let idCol = find(ID_COLS), nameCol = find(NAME_COLS);
+    const flagCol = find(FLAG_COLS);
+    let data = rows.slice(1);
+    if (idCol < 0 && nameCol < 0) {
+      if (rows[0].length === 1) { idCol = 0; data = rows; } // plain list of IDs, no header
+      else throw new Error(`No "api_id" or "api_name" column found. Columns in the file: ${rows[0].join(", ")}.`);
+    }
+    const byId = new Map(state.apis.map((a) => [a.id, a]));
+    const byName = new Map();
+    state.apis.forEach((a) => {
+      const k = String(a.name || "").toLowerCase();
+      byName.set(k, byName.has(k) ? null : a); // null = ambiguous name
+    });
+    const matched = new Map(), notFound = [], ambiguous = [], skipped = [];
+    for (const r of data) {
+      const id = idCol >= 0 ? (r[idCol] || "") : "";
+      const name = nameCol >= 0 ? (r[nameCol] || "") : "";
+      const label = name || id;
+      if (!id && !name) continue;
+      if (flagCol >= 0 && isFalse(r[flagCol] || "")) { skipped.push(label); continue; }
+      let api = id ? byId.get(id) : undefined;
+      if (!api && name) {
+        const hit = byName.get(name.toLowerCase());
+        if (hit === null) { ambiguous.push(label); continue; }
+        api = hit;
+      }
+      if (api) matched.set(api.id, api); else notFound.push(id ? `${label}${name && id ? ` (${id})` : ""}` : label);
+    }
+    state.selected = new Set(matched.keys());
+    state.selectedOnly = matched.size > 0;
+    state.q = ""; state.stateFilter = "all";
+    state.importResult = { file: fileName, rows: data.length, matched: matched.size, notFound, ambiguous, skipped };
+    renderApis();
+    if (matched.size) toast(`${matched.size} API${matched.size === 1 ? "" : "s"} selected from ${fileName}`);
+  }
+
+  function importBanner(r) {
+    const list = (arr) => arr.slice(0, 8).map(esc).join(", ") + (arr.length > 8 ? ` and ${arr.length - 8} more` : "");
+    const close = `<button class="icon-btn" id="import-close" aria-label="Dismiss" style="margin:-4px -6px 0 auto">${icon.close}</button>`;
+    if (r.error) {
+      return `<div class="banner err" id="import-banner">${icon.alert}<div><div class="b-title">Could not import ${esc(r.file)}</div>
+        <div class="b-body">${esc(r.error)} <a href="#" id="import-help">See the expected format</a></div></div>${close}</div>`;
+    }
+    const issues = [];
+    if (r.notFound.length) issues.push(`<div><b>${r.notFound.length} not found</b> among the V2 APIs (unknown ID, or already V4): ${list(r.notFound)}</div>`);
+    if (r.ambiguous.length) issues.push(`<div><b>${r.ambiguous.length} ambiguous</b> name${r.ambiguous.length > 1 ? "s" : ""} matching several APIs, use api_id instead: ${list(r.ambiguous)}</div>`);
+    if (r.skipped.length) issues.push(`<div><b>${r.skipped.length} skipped</b> (migrate_to_v4 = FALSE): ${list(r.skipped)}</div>`);
+    const cls = r.matched ? (issues.length ? "warn" : "ok-banner") : "err";
+    return `<div class="banner ${cls}" id="import-banner">${r.matched && !issues.length ? icon.check : icon.alert}<div>
+      <div class="b-title">${r.matched} of ${r.rows} API${r.rows === 1 ? "" : "s"} from ${esc(r.file)} selected</div>
+      <div class="b-body">${issues.join("") || "Review the selection, then click Migrate."}
+      ${issues.length ? ` <a href="#" id="import-help">CSV format help</a>` : ""}</div></div>${close}</div>`;
+  }
+
+  // Template for the import, pre-filled with the current V2 APIs.
+  // Same columns as `gravitee_v4_migration.py generate`.
+  function downloadTemplate() {
+    const cols = ["api_id", "api_name", "migrate_to_v4", "auto_deploy", "auto_start", "force_migration"];
+    const cell = (v) => { v = String(v ?? ""); return /[",;\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+    const lines = [cols.join(",")];
+    const apis = state.apis.length ? state.apis : [{ id: "5f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b", name: "My API", state: "STOPPED" }];
+    for (const a of apis) {
+      const started = String(a.state || "").toUpperCase() === "STARTED";
+      lines.push([a.id, a.name, "TRUE", "TRUE", started ? "TRUE" : "FALSE", "FALSE"].map(cell).join(","));
+    }
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `migration-input-${state.conn.env_id || "DEFAULT"}.csv`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
+  // ---------- migrate modal ----------
+  function openMigrateModal() {
+    const chosen = state.apis.filter((a) => state.selected.has(a.id));
+    if (!chosen.length) return;
+    const opts = { auto_deploy: true, keep_running: true, ...store.get("gvm.opts2", {}) };
+    const running = chosen.filter((a) => String(a.state).toUpperCase() === "STARTED").length;
+    const stopped = chosen.length - running;
+    const root = $("#modal-root");
+    root.innerHTML = `<div class="overlay" id="overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="modal-head"><h2 id="m-title">Migrate ${chosen.length} API${chosen.length > 1 ? "s" : ""} to V4</h2></div>
+      <div class="modal-body">
+        <div class="target">Target: <b>${esc(state.conn.base_url)}</b> · org <b>${esc(state.conn.org_id)}</b> · env <b>${esc(state.conn.env_id)}</b></div>
+        <div class="api-list">${chosen.map((a) => `<div><span>${esc(a.name || a.id)}</span>
+          <span class="api-list-meta">${a.version ? `<span class="muted">Version ${esc(a.version)}</span>` : ""}
+          <span class="state ${String(a.state).toUpperCase() === "STARTED" ? "on" : ""}"><span class="dot"></span>${String(a.state).toUpperCase() === "STARTED" ? "Started" : "Stopped"}</span>
+          ${syncCell(a.sync)}</span></div>`).join("")}</div>
+        <div class="opts">
+          <label class="check-row"><input type="checkbox" class="cb" id="opt-deploy" ${opts.auto_deploy ? "checked" : ""}>
+            <span><span class="t">Deploy after migration</span><br><span class="d">Creates a new deployment so the gateway runs the V4 definition. This also deploys any changes not yet deployed on the API. Without it, the gateway keeps running the V2 version until you deploy.</span></span></label>
+          <label class="check-row" id="keep-row"><input type="checkbox" class="cb" id="opt-keep" ${opts.keep_running ? "checked" : ""}>
+            <span><span class="t">Keep APIs running</span><br><span class="d" id="keep-desc"></span></span></label>
+          <label class="check-row"><input type="checkbox" class="cb" id="opt-force">
+            <span><span class="t">Force migration</span><br><span class="d">Migrates even when Gravitee reports issues it marks as forceable (for example an API out of sync with its last deployment). APIs Gravitee marks as impossible are never migrated.</span></span></label>
+        </div>
+        <div id="sync-warning"></div>
+        <div class="banner warn" style="margin-bottom:6px">${icon.alert}<div class="b-body">Migration rewrites each API definition in place. Make sure you have a backup or export of these APIs.</div></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="m-cancel">Cancel</button>
+        <button class="btn primary" id="m-run">${icon.play} Run migration</button>
+      </div></div></div>`;
+    const close = () => { root.innerHTML = ""; document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    $("#overlay").onclick = (e) => { if (e.target.id === "overlay") close(); };
+    $("#m-cancel").onclick = close;
+    const unsynced = chosen.filter(isUnsynced);
+    const renderSyncWarning = () => {
+      const el = $("#sync-warning");
+      if (!unsynced.length || $("#opt-force").checked) { el.innerHTML = ""; return; }
+      el.innerHTML = `<div class="banner err" style="margin-bottom:10px">${icon.alert}<div>
+        <div class="b-title">${unsynced.length} of ${chosen.length} selected API${chosen.length > 1 ? "s are" : " is"} out of sync</div>
+        <div class="b-body">${unsynced.map((a) => esc(a.name)).join(", ")}. Gravitee will refuse to migrate ${unsynced.length > 1 ? "them" : "it"}: deploy ${unsynced.length > 1 ? "them" : "it"} in APIM Console first, or tick <b>Force migration</b>.</div></div></div>`;
+    };
+    $("#opt-force").onchange = renderSyncWarning;
+    renderSyncWarning();
+    const renderKeep = () => {
+      const deploy = $("#opt-deploy").checked;
+      $("#opt-keep").disabled = !deploy;
+      $("#keep-row").style.opacity = deploy ? "" : ".5";
+      const parts = [];
+      if (running) parts.push(`${running} running API${running > 1 ? "s" : ""} will be started again after deployment`);
+      if (stopped) parts.push(`${stopped} stopped API${stopped > 1 ? "s" : ""} will stay stopped`);
+      $("#keep-desc").textContent = deploy
+        ? `Restarts only the APIs that were running before migration: ${parts.join(", ")}.`
+        : "Needs Deploy after migration: without a deployment there is no V4 version to run.";
+    };
+    $("#opt-deploy").onchange = renderKeep;
+    renderKeep();
+    $("#m-run").focus();
+    $("#m-run").onclick = async () => {
+      const auto_deploy = $("#opt-deploy").checked, force = $("#opt-force").checked;
+      const keep_running = auto_deploy && $("#opt-keep").checked;
+      store.set("gvm.opts2", { auto_deploy, keep_running: $("#opt-keep").checked });
+      $("#m-run").disabled = true; $("#m-run").innerHTML = `<span class="spinner"></span> Starting…`;
+      try {
+        const run = await request("POST", "/api/runs", {
+          config: connPayload(), auto_deploy, keep_running, force,
+          apis: chosen.map((a) => ({ id: a.id, name: a.name, version: a.version, state: a.state, lifecycle_state: a.lifecycle_state })),
+        });
+        close();
+        state.activeRun = run.id; updatePill(); watchActiveRun();
+        setView("run", { id: run.id });
+      } catch (e) {
+        $("#m-run").disabled = false; $("#m-run").innerHTML = `${icon.play} Run migration`;
+        toast(e.message);
+      }
+    };
+  }
+
+  // ---------- help view ----------
+  function renderHelp(section) {
+    const toc = [
+      ["quick-start", "Quick start"],
+      ["csv", "Importing a CSV"],
+      ["options", "Migration options"],
+      ["statuses", "States and statuses"],
+      ["logs", "Logs and exports"],
+      ["troubleshooting", "Troubleshooting"],
+      ["cli", "Command line"],
+    ];
+    $("#main").innerHTML = `
+      <div class="page-head"><div><h1>Documentation</h1><div class="sub">How to migrate Gravitee V2 APIs to V4 with this tool</div></div></div>
+      <div class="doc-layout">
+        <nav class="doc-toc card">${toc.map(([id, t]) => `<a href="#" data-sec="${id}">${t}</a>`).join("")}</nav>
+        <div class="doc">
+
+        <section class="card card-pad" id="sec-quick-start">
+          <h2>Quick start</h2>
+          <ol>
+            <li><b>Connect.</b> In <a href="#" data-go="connection">Connection</a>, enter a personal access token (or a username and password), check the Management API URL, organization and environment, then click <i>Save &amp; load APIs</i>. Credentials are never saved: enter them again each time you open the tool.</li>
+            <li><b>Select.</b> In <a href="#" data-go="apis">V2 APIs</a>, tick the APIs to migrate, use the header checkbox to select everything shown, or <b>Import CSV</b> to select a list of APIs from a file.</li>
+            <li><b>Check the Deployment column.</b> APIs that are <span class="badge warn">Out of sync</span> or <span class="badge warn">Never deployed</span> are refused by Gravitee. Deploy them in APIM Console first, or use <i>Force migration</i>.</li>
+            <li><b>Migrate.</b> Click <b>Migrate N APIs</b>, choose the options, then <b>Run migration</b>. Progress is shown live.</li>
+            <li><b>Review.</b> Migrated APIs leave the V2 list automatically. Failures stay in the list with the reason, and every migration is recorded in <a href="#" data-go="runs">Logs</a>.</li>
+          </ol>
+          <div class="doc-note">Migration rewrites each API definition in place. Export or back up your APIs before migrating them.</div>
+        </section>
+
+        <section class="card card-pad" id="sec-csv">
+          <h2>Importing a CSV</h2>
+          <p><b>Import CSV</b> on the V2 APIs page reads a file and <b>selects</b> the APIs it lists. Nothing is migrated until you click <b>Migrate</b>, and the deploy, start and force options are chosen in the migrate dialog.</p>
+          <h3>Expected format</h3>
+          <ul>
+            <li>A header row, then one API per row.</li>
+            <li>Comma <code>,</code> or semicolon <code>;</code> separated (Excel exports both work). UTF-8, with or without BOM.</li>
+            <li>A file with a single column and no header is read as a plain list of API IDs.</li>
+          </ul>
+          <div class="table-wrap"><table class="doc-table">
+            <thead><tr><th>Column</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>api_id</code></td><td>Yes*</td><td>The API ID, as shown when expanding a row in V2 APIs. Also accepted: <code>id</code>.</td></tr>
+              <tr><td><code>api_name</code></td><td>Yes*</td><td>Used to find the API when there is no <code>api_id</code>. Not case-sensitive; names shared by several APIs are reported as ambiguous. Also accepted: <code>name</code>.</td></tr>
+              <tr><td><code>migrate_to_v4</code></td><td>No</td><td><code>FALSE</code> skips the row. Any other value, or no column, selects it.</td></tr>
+              <tr><td><code>auto_deploy</code>, <code>auto_start</code>, <code>force_migration</code></td><td>No</td><td>Used by the command line only. In the web interface these are set in the migrate dialog.</td></tr>
+            </tbody>
+          </table></div>
+          <p class="muted" style="font-size:12.5px">* At least one of <code>api_id</code> or <code>api_name</code>. Other columns are ignored.</p>
+          <h3>Example</h3>
+          <pre class="doc-code">api_id,api_name,migrate_to_v4
+5f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b,Orders API,TRUE
+9e8d7c6b-5a49-4382-a1b0-c9d8e7f6a5b4,Payments API,FALSE</pre>
+          <p>After the import, a summary shows how many APIs were selected and lists the rows that were <b>not found</b> (unknown ID, or already V4), <b>ambiguous</b> or <b>skipped</b>. The list switches to <i>Selected only</i> so you can review the selection.</p>
+          <button class="btn" id="tpl-btn">${icon.download} Download a template with your V2 APIs</button>
+        </section>
+
+        <section class="card card-pad" id="sec-options">
+          <h2>Migration options</h2>
+          <dl class="doc-dl">
+            <dt>Deploy after migration</dt>
+            <dd>Creates a new deployment so the gateway runs the V4 definition. It also deploys any change not yet deployed on the API. Without it, the gateway keeps running the V2 version until someone deploys the API.</dd>
+            <dt>Keep APIs running</dt>
+            <dd>Requires Deploy. Starts again the APIs that were <b>running</b> before the migration. Stopped APIs stay stopped.</dd>
+            <dt>Force migration</dt>
+            <dd>Migrates even when Gravitee reports issues it marks as forceable, such as an API out of sync with its last deployment. APIs that Gravitee marks as impossible to migrate are never migrated.</dd>
+          </dl>
+          <p>Steps run in order for each API: migrate, then deploy, then start. A step is skipped when the previous one fails.</p>
+        </section>
+
+        <section class="card card-pad" id="sec-statuses">
+          <h2>States and statuses</h2>
+          <h3>Deployment (V2 APIs page)</h3>
+          <dl class="doc-dl">
+            <dt><span class="badge ok">In sync</span></dt><dd>The deployed version matches the API definition. Ready to migrate.</dd>
+            <dt><span class="badge warn">Out of sync</span></dt><dd>The API has changes that were never deployed. Gravitee refuses the migration unless forced.</dd>
+            <dt><span class="badge warn">Never deployed</span></dt><dd>The API has never been deployed. Gravitee refuses the migration unless forced.</dd>
+            <dt><span class="badge neutral">Unknown</span></dt><dd>The deployment state could not be read. Hover the badge for the reason.</dd>
+          </dl>
+          <h3>Last migration</h3>
+          <dl class="doc-dl">
+            <dt><span class="muted">Never migrated</span></dt><dd>No migration was attempted from this tool.</dd>
+            <dt><span class="badge err">Failed</span></dt><dd>Gravitee refused or rejected the migration. The reason is shown under the badge; expand the row for details. <span class="badge neutral">Can be forced</span> means <i>Force migration</i> would migrate it.</dd>
+            <dt><span class="badge warn">Still V2</span></dt><dd>A migration was reported successful but Gravitee still lists the API as V2.</dd>
+          </dl>
+          <h3>Migrations (Logs page)</h3>
+          <dl class="doc-dl">
+            <dt><span class="badge ok">Completed</span></dt><dd>Every step succeeded.</dd>
+            <dt><span class="badge warn">Completed with errors</span></dt><dd>At least one API failed a step.</dd>
+            <dt><span class="badge err">Nothing migrated</span></dt><dd>No API was migrated.</dd>
+            <dt><span class="badge err">Failed</span> / <span class="badge warn">Interrupted</span></dt><dd>The tool itself stopped (error, or the container restarted during the run).</dd>
+          </dl>
+        </section>
+
+        <section class="card card-pad" id="sec-logs">
+          <h2>Logs and exports</h2>
+          <ul>
+            <li><a href="#" data-go="runs">Logs</a> lists every migration with its target, options and result. Click a row for the per-API result and the console output.</li>
+            <li><b>Export logs</b>: all migration logs in one text file. <b>Export CSV</b>: one row per API per migration, with statuses and error messages.</li>
+            <li>The download icon on each row, or <b>Download log</b> on a migration's page, downloads the log of a single migration.</li>
+            <li>Files are kept in <code>data/runs/&lt;run-id&gt;/</code> on the host: <code>input.csv</code>, <code>results.csv</code>, <code>migration.log</code>, <code>console.log</code>.</li>
+          </ul>
+        </section>
+
+        <section class="card card-pad" id="sec-troubleshooting">
+          <h2>Troubleshooting</h2>
+          <dl class="doc-dl">
+            <dt>HTTP 401 Unauthorized</dt>
+            <dd>The token is invalid or expired. Create a new one in APIM Console › User › Tokens and paste it in <a href="#" data-go="connection">Connection</a>. Credentials are kept in the page's memory only: after a page reload, enter them again.</dd>
+            <dt>Cannot reach Gravitee</dt>
+            <dd>From inside Docker, <code>localhost</code> is the container itself. Use <code>http://host.docker.internal:8083</code> for a Gravitee running on your machine, or the service name if Gravitee runs in the same Docker network.</dd>
+            <dt>"This API is out of sync"</dt>
+            <dd>Deploy the API in APIM Console, click Refresh, then migrate again, or tick <i>Force migration</i>.</dd>
+            <dt>SSL certificate errors</dt>
+            <dd>For self-signed certificates in non-production environments, untick <i>Verify SSL certificates</i> in Connection.</dd>
+          </dl>
+        </section>
+
+        <section class="card card-pad" id="sec-cli">
+          <h2>Command line</h2>
+          <p>The original command-line workflow still works from the project folder:</p>
+          <pre class="doc-code">docker compose run --rm generate   # writes data/migration_input.csv
+docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
+          <p>On the command line, <code>auto_start=TRUE</code> starts the API whatever its previous state, and <code>force_migration=TRUE</code> forces the migration for that row.</p>
+        </section>
+        </div>
+      </div>`;
+    $$(".doc-toc a").forEach((a) => a.onclick = (e) => {
+      e.preventDefault();
+      $(`#sec-${a.dataset.sec}`).scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $$("[data-go]").forEach((a) => a.onclick = (e) => { e.preventDefault(); setView(a.dataset.go); });
+    $("#tpl-btn").onclick = downloadTemplate;
+    if (section) $(`#sec-${section}`)?.scrollIntoView({ block: "start" });
+  }
+
+  // ---------- connection view ----------
+  function renderConnection() {
+    const c = state.conn, d = state.defaults || {};
+    const ignored = d.ignored_credentials || [];
+    $("#main").innerHTML = `
+      <div class="page-head"><div><h1>Connection</h1><div class="sub">Management API used to list and migrate APIs</div></div></div>
+      ${ignored.length ? `<div class="banner warn">${icon.alert}<div><div class="b-title">Credentials in .env are ignored</div>
+        <div class="b-body">Remove ${ignored.map((k) => `<span class="mono">${esc(k)}</span>`).join(", ")} from <span class="mono">.env</span>, then run <span class="mono">docker compose up -d ui</span>. Credentials are only accepted from this page.</div></div></div>` : ""}
+      ${!hasCredentials() && state.connStatus !== "error" ? `<div class="banner info">${icon.plug}<div><div class="b-title">Sign in to your Gravitee Management API</div>
+        <div class="b-body">Enter a token, or a username and password, to list your V2 APIs. Credentials stay in this page's memory only: they are never saved, and closing or reloading the page clears them.</div></div></div>` : ""}
+      ${state.connStatus === "error" ? `<div class="banner err">${icon.alert}<div><div class="b-title">Last connection attempt failed</div><div class="b-body">${esc(state.connError)}</div></div></div>` : ""}
+      <form class="card card-pad" id="conn-form" autocomplete="off">
+        <div class="form-grid">
+          <div class="field full"><label for="f-base">Base URL <span class="env">GRAVITEE_BASE_URL</span></label>
+            <input class="input" id="f-base" required placeholder="http://localhost:8083" value="${esc(c.base_url)}">
+            <div class="hint">From inside Docker, use <span class="mono">http://host.docker.internal:8083</span> to reach a Gravitee running on your machine.</div></div>
+          <div class="field"><label for="f-org">Organization ID <span class="env">GRAVITEE_ORG_ID</span></label>
+            <input class="input" id="f-org" placeholder="DEFAULT" value="${esc(c.org_id)}"></div>
+          <div class="field"><label for="f-env">Environment ID <span class="env">GRAVITEE_ENV_ID</span></label>
+            <input class="input" id="f-env" placeholder="DEFAULT" value="${esc(c.env_id)}"></div>
+          <div class="divider"></div>
+          <div class="field full"><label>Authentication</label>
+            <div class="segmented" role="tablist">
+              <button type="button" data-mode="token" class="${c.auth_mode === "token" ? "on" : ""}">Bearer token</button>
+              <button type="button" data-mode="basic" class="${c.auth_mode === "basic" ? "on" : ""}">Username &amp; password</button>
+            </div></div>
+          <div class="field full" id="token-field" ${c.auth_mode === "token" ? "" : "hidden"}><label for="f-token">Personal access token</label>
+            <div class="input-group"><input class="input mono secret" id="f-token" type="${SECRET_TYPE}" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" placeholder="Paste your token" value="${esc(c.token)}">
+              <button type="button" class="btn" id="toggle-token" aria-label="Show token">${icon.eye}</button></div>
+            <div class="hint">Create one in APIM Console › User › Tokens. Kept in this page's memory only, never saved.</div></div>
+          <div class="field" data-basic ${c.auth_mode === "basic" ? "" : "hidden"}><label for="f-user">Username</label>
+            <input class="input" id="f-user" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" value="${esc(c.username)}"></div>
+          <div class="field" data-basic ${c.auth_mode === "basic" ? "" : "hidden"}><label for="f-pass">Password</label>
+            <input class="input secret" id="f-pass" type="${SECRET_TYPE}" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" value="${esc(c.password)}">
+            <div class="hint">Kept in this page's memory only, never saved.</div></div>
+          <div class="divider"></div>
+          <label class="check-row field full"><input type="checkbox" class="cb" id="f-ssl" ${c.verify_ssl ? "checked" : ""}>
+            <span><span class="t">Verify SSL certificates</span> <span class="env">GRAVITEE_VERIFY_SSL</span><br><span class="d">Turn off only for self-signed certificates in non-production environments.</span></span></label>
+        </div>
+        <div class="form-foot">
+          <button type="button" class="btn ghost" id="reset-btn" title="Base URL, organization, environment and SSL from .env">Reset to .env defaults</button>
+          ${hasCredentials() ? `<button type="button" class="btn" id="forget-btn">Clear credentials</button>` : ""}
+          <button type="submit" class="btn primary" id="save-btn">${icon.plug.replace('stroke-width="1.8"', 'stroke-width="2.2"')} Save &amp; load APIs</button>
+        </div>
+      </form>`;
+    const form = $("#conn-form");
+    $$(".segmented button", form).forEach((b) => b.onclick = () => {
+      readForm(); state.conn.auth_mode = b.dataset.mode; renderConnection();
+    });
+    $("#toggle-token").onclick = () => {
+      const i = $("#f-token");
+      if (SECRET_TYPE === "text") i.classList.toggle("revealed");
+      else i.type = i.type === "password" ? "text" : "password";
+    };
+    $("#reset-btn").onclick = () => { readForm(); applyDefaults(true); renderConnection(); toast("Restored .env defaults"); };
+    const forget = $("#forget-btn");
+    if (forget) forget.onclick = () => {
+      state.conn.token = ""; state.conn.username = ""; state.conn.password = "";
+      state.apis = []; state.meta = null; state.loaded = false; state.selected.clear();
+      state.connStatus = "idle"; state.connError = "";
+      updatePill(); renderConnection(); toast("Credentials cleared from this page");
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      readForm(); persistConn();
+      if (!hasCredentials()) {
+        state.connStatus = "error";
+        state.connError = state.conn.auth_mode === "basic" ? "Enter a username and password." : "Enter a personal access token.";
+        updatePill(); renderConnection(); return;
+      }
+      const btn = $("#save-btn"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Connecting…`;
+      const ok = await loadApis({ quiet: true });
+      if (ok) { toast(`Connected · ${state.apis.length} V2 APIs found`); setView("apis"); }
+      else renderConnection();
+    };
+  }
+  function readForm() {
+    const v = (id) => ($(id) ? $(id).value : undefined);
+    const c = state.conn;
+    c.base_url = v("#f-base").trim(); c.org_id = v("#f-org").trim() || "DEFAULT"; c.env_id = v("#f-env").trim() || "DEFAULT";
+    if ($("#f-token")) c.token = v("#f-token").trim();
+    if ($("#f-user")) c.username = v("#f-user").trim();
+    if ($("#f-pass")) c.password = v("#f-pass");
+    c.verify_ssl = $("#f-ssl").checked;
+  }
+  function applyDefaults(force) {
+    const d = state.defaults || {};
+    const src = force ? {} : saved;
+    state.conn.base_url = src.base_url ?? d.base_url ?? "";
+    state.conn.org_id = src.org_id ?? d.org_id ?? "DEFAULT";
+    state.conn.env_id = src.env_id ?? d.env_id ?? "DEFAULT";
+    state.conn.auth_mode = src.auth_mode ?? state.conn.auth_mode ?? "token";
+    state.conn.verify_ssl = src.verify_ssl ?? d.verify_ssl ?? true;
+    // Credentials typed in the page are kept: resetting only concerns non-secret settings.
+    if (force) { store.set("gvm.conn", { auth_mode: state.conn.auth_mode }); for (const k in saved) delete saved[k]; }
+  }
+
+  // ---------- runs ----------
+  async function loadRuns() {
+    try {
+      const data = await request("GET", "/api/runs");
+      state.runs = data.runs;
+      if (data.active_run && data.active_run !== state.activeRun) { state.activeRun = data.active_run; watchActiveRun(); }
+      updatePill();
+      if (state.view === "runs") renderRuns();
+    } catch (e) { toast(e.message); }
+  }
+  function runOptions(r) {
+    // keep_running is absent on runs made before the option existed (then "Start" meant start every API)
+    const start = r.auto_start && (r.keep_running ? "Keep running" : "Start");
+    return [r.force && "Force", r.auto_deploy && "Deploy", start].filter(Boolean).join(" + ") || "Migrate only";
+  }
+  function runFailures(r) {
+    const s = r.summary;
+    return s ? s.migration.failed + s.deploy.failed + s.start.failed : 0;
+  }
+  function runBadge(status, r) {
+    if (status === "completed" && r && r.summary) {
+      const total = r.count || r.total || 0;
+      if (total && r.summary.migration.success === 0) return `<span class="badge err">Nothing migrated</span>`;
+      if (runFailures(r)) return `<span class="badge warn">Completed with errors</span>`;
+    }
+    return {
+      running: `<span class="badge run"><span class="spinner"></span>Running</span>`,
+      completed: `<span class="badge ok">Completed</span>`,
+      failed: `<span class="badge err">Failed</span>`,
+      interrupted: `<span class="badge warn">Interrupted</span>`,
+    }[status] || `<span class="badge neutral">${esc(status)}</span>`;
+  }
+  function renderRuns() {
+    const runs = state.runs;
+    $("#main").innerHTML = `
+      <div class="page-head"><div><h1>Logs</h1><div class="sub">Every migration started from this tool, with the result for each API</div></div>
+        <div class="actions">
+          <button class="btn" id="runs-refresh">${icon.refresh} Refresh</button>
+          <a class="btn" href="/api/audit/logs.txt" ${runs.length ? "" : "hidden"} title="All migration logs in one text file">${icon.download} Export logs</a>
+          <a class="btn" href="/api/audit/export.csv" ${runs.length ? "" : "hidden"} title="One row per API per migration: statuses and error messages">${icon.download} Export CSV</a>
+        </div></div>
+      <div class="card">${!runs.length ? `<div class="empty">${icon.layers}<h3>No migration yet</h3><div>Select APIs in the V2 APIs page and run a migration.</div>
+        <button class="btn" id="go-apis">Go to V2 APIs</button></div>` : `
+        <div class="table-wrap"><table><thead><tr><th>Started</th><th>Target</th><th>APIs</th><th>Migrated</th><th>Options</th><th>Status</th><th></th></tr></thead>
+        <tbody>${runs.map((r) => {
+          const s = r.summary;
+          return `<tr class="row clickable" data-id="${esc(r.id)}">
+            <td><div class="api-name">${esc(fmtDate(r.created_at))}</div><div class="api-desc mono">${esc(r.id)}</div></td>
+            <td class="muted">${esc(r.config?.base_url || "")}<div class="api-desc">${esc(r.config?.org_id || "")} / ${esc(r.config?.env_id || "")}</div></td>
+            <td>${r.count}</td>
+            <td>${s ? `<span style="color:var(--ok);font-weight:600">${s.migration.success}</span>${s.migration.failed ? ` <span class="muted">·</span> <span style="color:var(--err);font-weight:600">${s.migration.failed} failed</span>` : ""}` : "—"}</td>
+            <td class="muted">${esc(runOptions(r))}</td>
+            <td>${runBadge(r.status, r)}</td>
+            <td class="col-dl">${r.status !== "running" ? `<a class="icon-btn row-dl" href="/api/runs/${encodeURIComponent(r.id)}/files/log" title="Download this migration's log" aria-label="Download log">${icon.download}</a>` : ""}</td></tr>`;
+        }).join("")}</tbody></table></div>`}
+      </div>`;
+    $("#runs-refresh").onclick = loadRuns;
+    const go = $("#go-apis"); if (go) go.onclick = () => setView("apis");
+    $$("tr.row[data-id]").forEach((tr) => tr.onclick = (e) => { if (!e.target.closest(".row-dl")) setView("run", { id: tr.dataset.id }); });
+  }
+
+  function stopPolling() { if (state.pollTimer) { clearTimeout(state.pollTimer); state.pollTimer = null; } }
+  async function openRun(id) {
+    stopPolling();
+    state.runId = id; state.run = null; state.runLines = [];
+    $("#main").innerHTML = `<div class="page-head"><div><h1>Run</h1><div class="sub">Loading…</div></div></div>`;
+    await pollRun();
+  }
+  async function pollRun() {
+    const id = state.runId;
+    try {
+      const d = await request("GET", `/api/runs/${encodeURIComponent(id)}?since=${state.runLines.length}`);
+      if (state.runId !== id || state.view !== "run") return;
+      state.runLines.push(...d.lines); state.run = d;
+      renderRunDetail();
+      if (d.status === "running") { state.pollTimer = setTimeout(pollRun, 700); }
+      else if (state.activeRun === id) onRunFinished(id, d);
+    } catch (e) {
+      if (state.view === "run") $("#main").innerHTML = `<div class="banner err">${icon.alert}<div>${esc(e.message)}</div></div>`;
+    }
+  }
+
+  // Watches the active run from any page, so the V2 API list is refreshed
+  // as soon as a migration ends, whichever page the user is on.
+  const finishedRuns = new Set();
+  let watchTimer = null;
+  function watchActiveRun() {
+    if (watchTimer || !state.activeRun) return;
+    const tick = async () => {
+      watchTimer = null;
+      const id = state.activeRun;
+      if (!id) return;
+      try {
+        const cfg = await request("GET", "/api/config");
+        if (cfg.active_run === id) {
+          if (state.view === "runs") loadRuns();
+          watchTimer = setTimeout(tick, 1500);
+          return;
+        }
+        const run = await request("GET", `/api/runs/${encodeURIComponent(id)}?since=999999999`).catch(() => null);
+        onRunFinished(id, run);
+        if (cfg.active_run) { state.activeRun = cfg.active_run; updatePill(); watchActiveRun(); }
+      } catch {
+        watchTimer = setTimeout(tick, 3000);
+      }
+    };
+    watchTimer = setTimeout(tick, 1500);
+  }
+  function onRunFinished(id, run) {
+    if (finishedRuns.has(id)) return;
+    finishedRuns.add(id);
+    if (state.activeRun === id) state.activeRun = null;
+    updatePill();
+    if (run) {
+      const ok = run.summary ? run.summary.migration.success : 0;
+      const failed = runFailures(run);
+      toast(run.status === "completed"
+        ? `Migration finished · ${ok} API${ok === 1 ? "" : "s"} migrated${failed ? ` · ${failed} error${failed === 1 ? "" : "s"}` : ""} · V2 list refreshed`
+        : "Migration failed · V2 list refreshed");
+    }
+    state.selected.clear();
+    loadApis({ quiet: true });
+    if (state.view === "runs") loadRuns();
+  }
+
+  function stepBadge(step, live, isCurrent, enabled) {
+    if (!enabled) return `<span class="badge neutral">Off</span>`;
+    if (step) {
+      const s = step.status;
+      if (s === "SUCCESS") return `<span class="badge ok">Success</span>`;
+      if (s === "FAILED") return `<span class="badge err">Failed</span>`;
+      if (s === "SKIPPED") return `<span class="badge neutral">Skipped</span>`;
+      return `<span class="badge neutral">Not run</span>`;
+    }
+    if (isCurrent) return `<span class="badge run"><span class="spinner"></span>Running</span>`;
+    return live ? `<span class="badge neutral">Pending</span>` : `<span class="badge neutral">Not run</span>`;
+  }
+
+  function renderRunDetail() {
+    const r = state.run;
+    const total = r.total || r.count || 0;
+    const done = r.status === "running" ? r.progress : total;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const results = r.results;
+    const byId = {};
+    if (results) results.forEach((x) => (byId[x.api_id] = x));
+    const s = r.summary;
+    const liveCount = (step, st) => Object.values(r.live || {}).filter((v) => v[step]?.status === st).length;
+    const cnt = (step, st) => s ? s[step][st === "SUCCESS" ? "success" : "failed"] : liveCount(step, st);
+    const failed = cnt("migration", "FAILED") + cnt("deploy", "FAILED") + cnt("start", "FAILED");
+
+    const rows = r.apis.map((a) => {
+      const res = byId[a.id];
+      const live = r.live?.[a.id];
+      const isCurrent = r.status === "running" && r.current === a.id;
+      let mig, dep, sta, errs = [];
+      if (res) {
+        mig = { status: res.migration_status }; dep = { status: res.deploy_status }; sta = { status: res.start_status };
+        [["Migration", res.migration_error], ["Deploy", res.deploy_error], ["Start", res.start_error]].forEach(([k, v]) => v && errs.push([k, v]));
+      } else if (live) {
+        mig = live.migration; dep = live.deploy; sta = live.start;
+        [["Migration", mig], ["Deploy", dep], ["Start", sta]].forEach(([k, v]) => v?.error && errs.push([k, v.error]));
+      }
+      const pending = r.status === "running";
+      const errHtml = errs.map(([k, v]) => `<div class="${/^Skipped/.test(v) ? "skip-text" : "err-text"}">${esc(k)}: ${esc(v)}</div>`).join("");
+      return `<tr class="row">
+        <td><div class="api-name">${esc(a.name || a.id)}</div><div class="api-desc mono">${esc(a.id)}</div>${errHtml}</td>
+        <td>${stepBadge(mig, pending, isCurrent && !mig, true)}</td>
+        <td>${stepBadge(dep?.status === "SKIPPED" ? null : dep, pending, isCurrent && mig && !dep, r.auto_deploy)}</td>
+        <td>${r.keep_running && a.state && a.state !== "STARTED"
+          ? `<span class="badge neutral" title="This API was stopped before migration">Stays stopped</span>`
+          : stepBadge(sta?.status === "SKIPPED" ? null : sta, pending, isCurrent && mig && (dep || !r.auto_deploy) && !sta, r.auto_start)}</td>
+      </tr>`;
+    }).join("");
+
+    const files = r.status !== "running" ? `
+      <a class="btn sm" href="/api/runs/${encodeURIComponent(r.id)}/files/log">${icon.download} Download log</a>` : "";
+
+    const consoleEl = $("#console-card");
+    const stick = !consoleEl || consoleEl.scrollTop + consoleEl.clientHeight >= consoleEl.scrollHeight - 30;
+    const openConsole = $("#console-card") ? !$("#console-card").hidden : r.status !== "completed";
+
+    $("#main").innerHTML = `
+      <div class="page-head">
+        <div><button class="btn ghost sm" id="back-runs" style="margin:-4px 0 6px -10px">${icon.back} Logs</button>
+          <h1 style="display:flex;align-items:center;gap:10px">Migration run ${runBadge(r.status, r)}</h1></div>
+        <div class="actions">${files}</div>
+      </div>
+      ${r.error ? `<div class="banner err">${icon.alert}<div><div class="b-title">Run did not complete</div><div class="b-body">${esc(r.error)}</div></div></div>` : ""}
+      <div class="card card-pad">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-weight:600">
+          <span>${r.status === "running" ? `Processing ${Math.min(done + 1, total)} of ${total}` : `${total} API${total === 1 ? "" : "s"} processed`}</span><span class="muted">${pct}%</span></div>
+        <div class="progress ${r.status === "completed" ? "done" : r.status === "running" ? "" : "failed"}"><div style="width:${pct}%"></div></div>
+        <div class="run-meta">
+          <span>Target <b>${esc(r.config?.base_url)}</b></span>
+          <span>Org / env <b>${esc(r.config?.org_id)} / ${esc(r.config?.env_id)}</b></span>
+          <span>Options <b>${esc(runOptions(r))}</b></span>
+          <span>Started <b>${esc(fmtDate(r.created_at))}</b></span>
+          ${r.finished_at ? `<span>Finished <b>${esc(fmtDate(r.finished_at))}</b></span>` : ""}
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="label">Migrated</div><div class="value">${cnt("migration", "SUCCESS")}<small> / ${total}</small></div></div>
+        <div class="stat"><div class="label">Deployed</div><div class="value">${r.auto_deploy ? cnt("deploy", "SUCCESS") : "—"}</div></div>
+        <div class="stat"><div class="label">${r.keep_running ? "Kept running" : "Started"}</div><div class="value">${r.auto_start ? cnt("start", "SUCCESS") : "—"}</div></div>
+        <div class="stat"><div class="label">Failures</div><div class="value ${failed ? "err" : ""}">${failed}</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>APIs</h2></div>
+        <div class="table-wrap"><table><thead><tr><th>API</th><th>Migration</th><th>Deploy</th><th>Start</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-head clickable" id="console-toggle"><h2>Console output</h2><span class="muted" style="font-size:12.5px">${state.runLines.length} lines · ${openConsole ? "Hide" : "Show"}</span></div>
+        <pre class="console" id="console-card" ${openConsole ? "" : "hidden"}></pre>
+      </div>`;
+    const pre = $("#console-card");
+    pre.innerHTML = state.runLines.map((l) => {
+      const cls = /ERROR|FAILED|❌|Traceback/.test(l) ? "l-err" : /WARNING|⚠️/.test(l) ? "l-warn" : /SUCCESS|✅/.test(l) ? "l-ok" : "";
+      return cls ? `<span class="${cls}">${esc(l)}</span>` : esc(l);
+    }).join("\n") || '<span style="opacity:.6">Waiting for output…</span>';
+    if (stick) pre.scrollTop = pre.scrollHeight;
+    $("#console-toggle").onclick = () => { pre.hidden = !pre.hidden; renderRunDetail(); };
+    $("#back-runs").onclick = () => setView("runs");
+  }
+
+  // ---------- theme ----------
+  const themeKey = "gvm.theme";
+  const applyTheme = (t) => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
+  applyTheme(store.get(themeKey, null));
+  $("#theme-btn").onclick = () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    applyTheme(next); store.set(themeKey, next);
+  };
+
+  // ---------- boot ----------
+  (async function boot() {
+    try {
+      const cfg = await request("GET", "/api/config");
+      state.defaults = cfg.defaults; state.activeRun = cfg.active_run;
+    } catch { state.defaults = {}; }
+    applyDefaults(false);
+    updatePill();
+    watchActiveRun();
+    // Credentials are never stored: every visit starts on the Connection page,
+    // unless a migration is running (its progress needs no credentials).
+    if (state.activeRun) setView("run", { id: state.activeRun });
+    else setView("connection");
+  })();
+})();
+</script>
+</body>
+</html>

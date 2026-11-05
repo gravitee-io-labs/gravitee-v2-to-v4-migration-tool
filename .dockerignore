@@ -1,0 +1,12 @@
+.env
+data/
+*.log
+*.csv
+__pycache__/
+*.pyc
+.env.example
+README.md
+docs/
+.gitignore
+.git/
+dist/

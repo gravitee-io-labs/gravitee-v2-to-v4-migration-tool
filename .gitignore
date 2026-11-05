@@ -1,0 +1,17 @@
+# Credentials - never commit. Copy .env.example to .env instead.
+.env
+
+# Runtime data: migration CSVs, logs and run history
+data/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Shareable archives
+dist/

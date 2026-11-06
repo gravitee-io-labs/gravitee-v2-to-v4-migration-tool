@@ -102,13 +102,33 @@ class GraviteeClient:
         except Exception:
             return body[:300] if body else f"HTTP {status}"
 
+    def describe_error(self, status, body, action, needs="read the APIs"):
+        """Turn an HTTP failure into a message that says what to fix."""
+        msg = self._parse_error(status, body) if status else (body or "no response")
+        where = f"organization '{self.org}', environment '{self.env}'"
+        if status == 0:
+            return (f"Could not reach the Management API at {self.base} to {action}: {msg}. "
+                    "Check the Management API URL and that Gravitee is running.")
+        if status == 401:
+            return (f"Authentication failed (HTTP 401) to {action}: {msg}. "
+                    "The token is invalid, expired or revoked, or the username or password is wrong.")
+        if status == 403:
+            return (f"Permission denied (HTTP 403) to {action} in {where}: {msg}. "
+                    f"The user must be allowed to {needs} in this environment: give it an environment "
+                    "role with these permissions (for example ADMIN), "
+                    "or make it a member of the APIs.")
+        if status == 404:
+            return (f"Not found (HTTP 404) to {action}: {msg}. Check the Management API URL, "
+                    f"the organization ID '{self.org}' and the environment ID '{self.env}'.")
+        return f"Failed to {action} (HTTP {status}): {msg}"
+
     def list_all_apis(self):
         apis, page = [], 1
         while True:
             url = self._url_v1("apis")
             status, body = self._request("GET", url, params={"page": page, "size": self.page_size})
             if status != 200:
-                raise RuntimeError(f"Failed to list APIs (HTTP {status}): {self._parse_error(status, body)}")
+                raise RuntimeError(self.describe_error(status, body, "list the APIs"))
             data = json.loads(body)
             if isinstance(data, list):
                 apis.extend(data)
@@ -139,6 +159,13 @@ class GraviteeClient:
             self.last_details = [f"Gravitee response : HTTP {status or 'no response'}"]
             if body and body.strip() and body.strip()[:300] != msg:
                 self.last_details.append(f"Response body     : {body.strip()[:500]}")
+            if status == 401:
+                self.last_details.append("How to fix        : The token is invalid, expired or revoked, "
+                                         "or the username or password is wrong.")
+            elif status == 403:
+                self.last_details.append("How to fix        : The user is not allowed to migrate this API. "
+                                         "It needs UPDATE on the API definition: an environment role "
+                                         "such as ADMIN, or the OWNER / PRIMARY_OWNER role on the API.")
             return False, f"HTTP {status}: {msg}" if status else msg
         try:
             data = json.loads(body) if body else {}
@@ -189,7 +216,7 @@ class GraviteeClient:
         status, body = self._request("POST", url)
         if status in (200, 202):
             return True, "Deployment succeeded"
-        return False, f"HTTP {status}: {self._parse_error(status, body)}"
+        return False, self._step_error(status, body, "deploy")
 
     def start_api(self, api_id):
         url = self._url_v2(f"apis/{api_id}/_start")
@@ -199,7 +226,15 @@ class GraviteeClient:
         err = self._parse_error(status, body)
         if "already started" in err.lower():
             return True, "Already started (no action needed)"
-        return False, f"HTTP {status}: {err}"
+        return False, self._step_error(status, body, "start")
+
+    def _step_error(self, status, body, verb):
+        err = f"HTTP {status}: {self._parse_error(status, body)}"
+        if status == 401:
+            return err + " (authentication failed: token invalid, expired or revoked)"
+        if status == 403:
+            return err + f" (permission denied: the user is not allowed to {verb} this API)"
+        return err
 
 
 def get_definition_version(api):

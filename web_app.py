@@ -195,6 +195,79 @@ def sync_state(client, api_id):
             "error": f"HTTP {status}: {client._parse_error(status, body)}" if status else "No response"}
 
 
+def _json_body(body):
+    try:
+        return json.loads(body) if body else None
+    except ValueError:
+        return None
+
+
+def _role_names(roles):
+    names = []
+    for r in roles or []:
+        name = r.get("name") if isinstance(r, dict) else r
+        if name and str(name) not in names:
+            names.append(str(name))
+    return names
+
+
+def diagnose_access(client):
+    """Explain why Gravitee returned no API at all.
+
+    Gravitee does not answer 403 when a user lacks permissions on the API list:
+    it answers 200 with only the APIs that user can read, so an empty list
+    usually means missing permissions (or the wrong environment).
+    Returns {"code", "title", "detail", "hints", "user", "roles"}.
+    """
+    org_url = f"{client.base}/management/organizations/{client.org}"
+    user, roles = "", []
+
+    status, body = client._request("GET", f"{org_url}/user")
+    if status in (401, 403):
+        return {"code": "AUTH", "title": "Gravitee rejected these credentials",
+                "detail": client.describe_error(status, body, "read the current user"),
+                "hints": [], "user": "", "roles": []}
+    data = _json_body(body) if status == 200 else None
+    if isinstance(data, dict):
+        user = data.get("displayName") or data.get("email") or data.get("username") or ""
+        env_roles = data.get("envRoles") or data.get("env_roles") or {}
+        if isinstance(env_roles, dict):
+            roles = _role_names(env_roles.get(client.env))
+        if not roles:
+            roles = _role_names([r for r in (data.get("roles") or [])
+                                 if isinstance(r, dict) and str(r.get("scope", "")).upper() == "ENVIRONMENT"])
+
+    status, body = client._request("GET", f"{org_url}/environments")
+    envs = _json_body(body) if status == 200 else None
+    if isinstance(envs, dict):
+        envs = envs.get("data")
+    if isinstance(envs, list) and envs:
+        def ids(e):
+            return {str(e.get("id", ""))} | {str(h) for h in (e.get("hrids") or [])}
+        known = [e for e in envs if isinstance(e, dict)]
+        if known and not any(client.env in ids(e) for e in known):
+            names = ", ".join(sorted(str(e.get("id", "")) for e in known)[:10])
+            return {"code": "ENV", "title": f"Environment '{client.env}' is not accessible",
+                    "detail": (f"This user cannot access an environment with ID '{client.env}' in organization "
+                               f"'{client.org}'. Environments it can access: {names}."),
+                    "hints": ["Check the environment ID in the Connection page.",
+                              "Or give this user a role in that environment."],
+                    "user": user, "roles": roles}
+
+    who = f"User {user}" if user else "This user"
+    role_txt = f" (environment role: {', '.join(roles)})" if roles else ""
+    return {"code": "NO_VISIBLE_APIS", "title": "No API visible with these credentials",
+            "detail": (f"Gravitee returned no API in organization '{client.org}', environment '{client.env}'. "
+                       f"It only lists the APIs the user is allowed to read, so this usually means missing "
+                       f"permissions. {who}{role_txt} cannot see any API."),
+            "hints": ["Give the user an environment role with the API READ permission (for example ADMIN). "
+                      "Migrating, deploying and starting also need UPDATE on the API definition.",
+                      "Or make the user a member (OWNER or PRIMARY_OWNER) of the APIs to migrate.",
+                      "If the token belongs to another user, create a personal access token for an administrator.",
+                      "If the environment really has no API, check the organization and environment IDs."],
+            "user": user, "roles": roles}
+
+
 def list_v2_apis(cfg):
     client = gm.GraviteeClient(cfg)
     all_apis = client.list_all_apis()
@@ -230,7 +303,15 @@ def list_v2_apis(cfg):
     attempts = last_attempts(cfg)
     for api in v2:
         api["last_migration"] = attempts.get(api["id"])
-    return {"apis": v2, "total": len(all_apis), "other_versions": others}
+    access = None
+    if not all_apis:
+        try:
+            access = diagnose_access(client)
+        except Exception as exc:  # the diagnosis must never hide the (empty) list
+            access = {"code": "NO_VISIBLE_APIS", "title": "No API visible with these credentials",
+                      "detail": f"Gravitee returned no API, and the permission check failed: {exc}",
+                      "hints": [], "user": "", "roles": []}
+    return {"apis": v2, "total": len(all_apis), "other_versions": others, "access": access}
 
 
 def last_attempts(cfg):

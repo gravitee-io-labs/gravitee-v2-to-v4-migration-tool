@@ -192,6 +192,14 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
 .banner.info svg { color: var(--accent); }
 .banner.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 .banner .b-title { font-weight: 650; }
+.access-problem { display: flex; gap: 14px; padding: 28px 28px 30px; max-width: 760px; }
+.access-problem .ap-icon { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--warn-soft); color: var(--warn); }
+.access-problem .ap-icon svg { width: 18px; height: 18px; }
+.access-problem h3 { margin: 6px 0 6px; font-size: 15px; }
+.access-problem p { margin: 0 0 12px; color: var(--muted); line-height: 1.5; word-break: break-word; }
+.access-problem .ap-label { font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+.access-problem ul { margin: 0 0 14px; padding-left: 18px; line-height: 1.55; }
+.access-problem .ap-actions { display: flex; align-items: center; gap: 14px; }
 .banner .b-body { color: var(--text); opacity: .85; word-break: break-word; }
 
 /* Forms */
@@ -458,13 +466,15 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
       idle: ["idle", "Not connected"],
       loading: ["busy", "Connecting…"],
       ok: ["ok", `Connected · ${state.conn.env_id || "DEFAULT"}`],
+      warn: ["busy", "Connected · no API visible"],
       error: ["err", "Connection error"],
     };
-    let [cls, text] = map[state.connStatus];
+    const noAccess = state.connStatus === "ok" && state.meta?.access;
+    let [cls, text] = map[noAccess ? "warn" : state.connStatus];
     if (state.activeRun) { cls = "busy"; text = "Migration running"; }
     pill.className = "pill " + cls;
     pill.innerHTML = `<span class="dot"></span><span>${esc(text)}</span>`;
-    pill.title = state.connStatus === "error" ? state.connError : (state.conn.base_url || "");
+    pill.title = state.connStatus === "error" ? state.connError : noAccess ? state.meta.access.title : (state.conn.base_url || "");
     $("#nav-api-count").textContent = state.loaded ? state.apis.length : "";
     $("#nav-run-flag").className = state.activeRun ? "live-dot" : "";
   }
@@ -501,9 +511,26 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
     if (view === "help") renderHelp(opts.section);
     if (view === "runs") { renderRuns(); loadRuns(); }
     if (view === "run") openRun(opts.id);
-    window.scrollTo(0, 0);
+    if (!opts.section) window.scrollTo(0, 0);  // renderHelp scrolls to its section itself
   }
   $$(".nav-item").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+
+  // Gravitee returned no API at all: explain why (usually permissions).
+  function accessProblem(a) {
+    const hints = (a.hints || []).map((h) => `<li>${esc(h)}</li>`).join("");
+    return `<div class="access-problem">
+      <div class="ap-icon">${icon.alert}</div>
+      <div>
+        <h3>${esc(a.title)}</h3>
+        <p>${esc(a.detail)}</p>
+        ${hints ? `<div class="ap-label">How to fix</div><ul>${hints}</ul>` : ""}
+        <div class="ap-actions">
+          <button class="btn primary sm" id="access-conn">Check connection settings</button>
+          <a href="#" id="access-help">Troubleshooting</a>
+        </div>
+      </div>
+    </div>`;
+  }
 
   // ---------- V2 APIs view ----------
   function filteredApis() {
@@ -577,6 +604,13 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
         <div>Fill in the management API URL, organization, environment and token to list your V2 APIs.</div>
         <button class="btn primary" id="empty-conn">Open connection settings</button></div>`;
       $("#empty-conn").onclick = () => setView("connection");
+      return;
+    }
+    if (!state.apis.length && m?.access) {
+      card.innerHTML = accessProblem(m.access);
+      $("#access-conn").onclick = () => setView("connection");
+      $("#access-help").onclick = (e) => { e.preventDefault(); setView("help", { section: "troubleshooting" }); };
+      updateSelectionUi();
       return;
     }
     if (!state.apis.length) {
@@ -1058,6 +1092,12 @@ tbody tr.row.is-selected td { background: color-mix(in srgb, var(--accent-soft) 
           <dl class="doc-dl">
             <dt>HTTP 401 Unauthorized</dt>
             <dd>The token is invalid or expired. Create a new one in APIM Console › User › Tokens and paste it in <a href="#" data-go="connection">Connection</a>. Credentials are kept in the page's memory only: after a page reload, enter them again.</dd>
+            <dt>"No API visible with these credentials"</dt>
+            <dd>Gravitee only lists the APIs the user is allowed to read. It doesn't refuse the request; it returns an empty list. So when no API comes back at all, the tool checks the user and environment and shows what is missing. Give the user an environment role with the <i>API READ</i> permission (for example ADMIN), or make it a member of the APIs. Migrating, deploying and starting also need <i>UPDATE</i> on the API definition. A user that sees only some APIs gets only those in the list.</dd>
+            <dt>HTTP 403 Permission denied</dt>
+            <dd>The user is not allowed to do this action on the API or the environment. The message says which action. Grant the matching permission (see above), or use a token of an administrator.</dd>
+            <dt>"Environment … is not accessible"</dt>
+            <dd>The environment ID doesn't exist, or the user has no role in it. The message lists the environments the user can access. Fix the ID in <a href="#" data-go="connection">Connection</a>.</dd>
             <dt>Cannot reach Gravitee</dt>
             <dd>From inside Docker, <code>localhost</code> is the container itself. Use <code>http://host.docker.internal:8083</code> for a Gravitee running on your machine, or the service name if Gravitee runs in the same Docker network. Set it in Connection › Base URL.</dd>
             <dt>"This API is out of sync"</dt>
@@ -1172,7 +1212,8 @@ docker compose run --rm migrate    # migrates rows with migrate_to_v4=TRUE</pre>
       }
       const btn = $("#save-btn"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Connecting…`;
       const ok = await loadApis({ quiet: true });
-      if (ok) { toast(`Connected · ${state.apis.length} V2 APIs found`); setView("apis"); }
+      if (ok && state.meta?.access) { toast(state.meta.access.title, "warn"); setView("apis"); }
+      else if (ok) { toast(`Connected · ${state.apis.length} V2 APIs found`); setView("apis"); }
       else renderConnection();
     };
   }

@@ -24,7 +24,7 @@ It runs in a single Docker container, and only uses the Python standard library.
 
 - Docker with Docker Compose v2.
 - Gravitee APIM 4.x, with its Management API reachable from the container.
-- A Gravitee user allowed to manage the APIs, with a **personal access token** (APIM Console › User › Tokens) or a username and password.
+- A Gravitee user allowed to manage the APIs, with a **personal access token** (APIM Console › User › Tokens) or a username and password. It needs the environment **API READ** permission to list the APIs, and **UPDATE** on the API definition to migrate, deploy and start them: for example the `ADMIN` environment role, or the `OWNER` / `PRIMARY_OWNER` role on each API. Gravitee only lists the APIs a user can read, so a user with too few permissions sees an empty list; the tool detects it and says what is missing.
 
 ## Quick start
 
@@ -279,6 +279,9 @@ Everything is configured in the Connection page, as with Docker. The Base URL is
 | Symptom | Fix |
 |---|---|
 | `HTTP 401 Unauthorized` | The token is invalid or expired. Create a new one in APIM Console › User › Tokens, then paste it in **Connection**. |
+| *"No API visible with these credentials"* | Gravitee only lists the APIs the user can read: with too few permissions it returns an empty list, not an error. The tool then checks the user and environment and explains what is missing. Give the user an environment role with **API READ** (e.g. `ADMIN`), or make it a member of the APIs. Migrating, deploying and starting also need **UPDATE** on the API definition. |
+| `HTTP 403 Permission denied` | The user may not do this action on the API or environment; the message names the action. Grant the permission above, or use an administrator's token. |
+| *"Environment … is not accessible"* | The environment ID is wrong or the user has no role in it. The message lists the environments the user can access. |
 | Back on the Connection page after a reload | Expected: credentials are never stored. Enter them again. |
 | Cannot connect / connection refused | The Base URL in Connection must be reachable from the container. See [Reaching Gravitee](#reaching-gravitee). |
 | `HTTP 404` when listing APIs | Check the organization and environment IDs, and that the base URL doesn't include `/management`. |
